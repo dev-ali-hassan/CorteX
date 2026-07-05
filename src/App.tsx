@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import type { KeyboardEvent } from "react";
 import clsx from "clsx";
 import {
-  BookOpen,
   ChevronDown,
   ClipboardCopy,
   Copy,
@@ -9,9 +9,7 @@ import {
   Moon,
   RefreshCw,
   Replace,
-  Search,
   Settings,
-  Star,
   Wand2,
   X,
   Minus,
@@ -29,9 +27,8 @@ import {
   type AppSettings
 } from "./lib/desktop";
 import { defaultInput, defaultOutput, rewriteModes, type RewriteModeId } from "./data/modes";
-import { promptCategories, promptTemplates, type PromptCategory } from "./data/prompts";
 
-type ViewKey = "rewrite" | "library" | "favorites" | "settings";
+type ViewKey = "rewrite" | "settings";
 
 const providerLabels = {
   offline: "Offline utilities",
@@ -66,7 +63,7 @@ function App() {
       .catch(() => setSettings(defaultSettings));
 
     listenToTrayNavigation((route) => {
-      if (route === "favorites" || route === "settings" || route === "rewrite") {
+      if (route === "settings" || route === "rewrite") {
         setView(route);
       }
     }).then((unlisten) => () => unlisten());
@@ -118,8 +115,6 @@ function App() {
 
   const mainTitle = {
     rewrite: "Quick Rewrite",
-    library: "Prompt Library",
-    favorites: "Favorites",
     settings: "Settings"
   }[view];
 
@@ -134,18 +129,6 @@ function App() {
             icon={Wand2}
             label="Quick Rewrite"
             onClick={() => setView("rewrite")}
-          />
-          <NavButton
-            active={view === "library"}
-            icon={BookOpen}
-            label="Prompt Library"
-            onClick={() => setView("library")}
-          />
-          <NavButton
-            active={view === "favorites"}
-            icon={Star}
-            label="Favorites"
-            onClick={() => setView("favorites")}
           />
           <NavButton
             active={view === "settings"}
@@ -166,7 +149,7 @@ function App() {
         </div>
         <button className="theme-button" type="button" aria-label="Theme menu">
           <Moon size={24} aria-hidden="true" />
-          <span>{settings.theme === "dark" ? "Dark" : "Light"}</span>
+          <span>{settings.theme === "system" ? "System" : settings.theme === "dark" ? "Dark" : "Light"}</span>
           <ChevronDown size={18} aria-hidden="true" />
         </button>
         <div className="sidebar-footer">
@@ -210,16 +193,6 @@ function App() {
             onReplace={handleReplace}
           />
         )}
-        {view === "library" && <PromptLibrary onUse={(nextMode) => {
-          setMode(nextMode);
-          setView("rewrite");
-          void runRewrite(nextMode);
-        }} />}
-        {view === "favorites" && <Favorites onUse={(nextMode) => {
-          setMode(nextMode);
-          setView("rewrite");
-          void runRewrite(nextMode);
-        }} />}
         {view === "settings" && (
           <SettingsView
             settings={settings}
@@ -237,12 +210,6 @@ function App() {
 }
 
 function viewSubtitle(view: ViewKey) {
-  if (view === "library") {
-    return "Browse reusable prompts with variables for every writing workflow.";
-  }
-  if (view === "favorites") {
-    return "Keep your most-used transformations one click away.";
-  }
   return "Choose providers, shortcuts, and behavior for the desktop assistant.";
 }
 
@@ -399,87 +366,6 @@ function QuickRewrite({
   );
 }
 
-function PromptLibrary({ onUse }: { onUse: (mode: RewriteModeId) => void }) {
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<PromptCategory | "All">("All");
-  const prompts = useMemo(
-    () =>
-      promptTemplates.filter((prompt) => {
-        const matchesCategory = category === "All" || prompt.category === category;
-        const matchesQuery =
-          !query ||
-          prompt.title.toLowerCase().includes(query.toLowerCase()) ||
-          prompt.prompt.toLowerCase().includes(query.toLowerCase());
-        return matchesCategory && matchesQuery;
-      }),
-    [category, query]
-  );
-
-  return (
-    <div className="content-surface">
-      <div className="library-toolbar">
-        <label className="search-field">
-          <Search size={20} aria-hidden="true" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search prompts"
-          />
-        </label>
-        <div className="category-tabs" role="tablist" aria-label="Prompt categories">
-          {(["All", ...promptCategories] as Array<PromptCategory | "All">).map((item) => (
-            <button
-              className={clsx(category === item && "active")}
-              type="button"
-              key={item}
-              onClick={() => setCategory(item)}
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="prompt-grid">
-        {prompts.map((prompt) => (
-          <article className="prompt-card" key={prompt.id}>
-            <div>
-              <span>{prompt.category}</span>
-              <h2>{prompt.title}</h2>
-              <p>{prompt.prompt}</p>
-            </div>
-            <div className="prompt-footer">
-              <small>{prompt.variables.length ? prompt.variables.map((item) => `{${item}}`).join(" ") : "No variables"}</small>
-              <button type="button" onClick={() => onUse(prompt.mode)}>
-                Use
-              </button>
-            </div>
-          </article>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function Favorites({ onUse }: { onUse: (mode: RewriteModeId) => void }) {
-  const favorites = promptTemplates.filter((prompt) => prompt.favorite);
-  return (
-    <div className="content-surface favorite-list">
-      {favorites.map((prompt) => (
-        <article className="favorite-row" key={prompt.id}>
-          <Star size={26} aria-hidden="true" />
-          <div>
-            <h2>{prompt.title}</h2>
-            <p>{prompt.prompt}</p>
-          </div>
-          <button type="button" onClick={() => onUse(prompt.mode)}>
-            Run
-          </button>
-        </article>
-      ))}
-    </div>
-  );
-}
-
 function SettingsView({
   settings,
   onChange
@@ -506,107 +392,188 @@ function SettingsView({
   }
 
   return (
-    <div className="settings-grid">
-      <section className="settings-panel">
-        <h2>Provider</h2>
-        <label>
-          <span>AI provider</span>
-          <select
-            value={settings.provider.provider}
-            onChange={(event) => updateProvider({ provider: event.target.value as AppSettings["provider"]["provider"] })}
-          >
-            {providerEntries.map(([value, label]) => (
-              <option value={value} key={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span>Model</span>
-          <input value={settings.provider.model} onChange={(event) => updateProvider({ model: event.target.value })} />
-        </label>
-        <label>
-          <span>API key</span>
-          <input
-            value={settings.provider.apiKey ?? ""}
-            type="password"
-            placeholder="Stored locally"
-            onChange={(event) => updateProvider({ apiKey: event.target.value })}
-          />
-        </label>
-        <label>
-          <span>Custom endpoint</span>
-          <input
-            value={settings.provider.endpoint ?? ""}
-            placeholder="Optional"
-            onChange={(event) => updateProvider({ endpoint: event.target.value })}
-          />
-        </label>
-      </section>
-
-      <section className="settings-panel">
-        <h2>Desktop</h2>
-        <label>
-          <span>Floating window</span>
-          <input value={settings.globalShortcut} onChange={(event) => update({ globalShortcut: event.target.value })} />
-        </label>
-        <label>
-          <span>Grammar rewrite</span>
-          <input value={settings.grammarShortcut} onChange={(event) => update({ grammarShortcut: event.target.value })} />
-        </label>
-        <label>
-          <span>Professional rewrite</span>
-          <input
-            value={settings.professionalShortcut}
-            onChange={(event) => update({ professionalShortcut: event.target.value })}
-          />
-        </label>
-        <ToggleRow
-          label="Auto copy after rewrite"
-          checked={settings.autoCopy}
-          onChange={(autoCopy) => update({ autoCopy })}
-        />
-        <ToggleRow
-          label="Auto replace from shortcuts"
-          checked={settings.autoReplace}
-          onChange={(autoReplace) => update({ autoReplace })}
-        />
-      </section>
-
-      <section className="settings-panel wide">
-        <h2>Writing Defaults</h2>
-        <div className="range-row">
+    <div className="settings-shell">
+      <section className="settings-panel settings-stack">
+        <div className="settings-section">
+          <h2>AI</h2>
           <label>
-            <span>Temperature</span>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={settings.provider.temperature}
-              onChange={(event) => updateProvider({ temperature: Number(event.target.value) })}
+            <span>Provider</span>
+            <select
+              value={settings.provider.provider}
+              onChange={(event) => updateProvider({ provider: event.target.value as AppSettings["provider"]["provider"] })}
+            >
+              {providerEntries.map(([value, label]) => (
+                <option value={value} key={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>API Key</span>
+            <input value={settings.provider.apiKey?.trim() ? "************" : "Not connected"} readOnly />
+          </label>
+          <button className="test-connection-button" type="button">
+            Test Connection
+          </button>
+        </div>
+
+        <div className="settings-divider" />
+
+        <div className="settings-section">
+          <h2>General</h2>
+          <label>
+            <span>Custom prompt</span>
+            <textarea
+              className="settings-textarea"
+              value={settings.customPrompt}
+              placeholder="Tell CorteX how to rewrite when an AI provider is connected."
+              onChange={(event) => update({ customPrompt: event.target.value })}
             />
           </label>
-          <strong>{settings.provider.temperature.toFixed(2)}</strong>
-        </div>
-        <label>
-          <span>Maximum tokens</span>
-          <input
-            type="number"
-            min="100"
-            max="4000"
-            value={settings.provider.maxTokens}
-            onChange={(event) => updateProvider({ maxTokens: Number(event.target.value) })}
+          <ToggleRow
+            label="Launch at startup"
+            checked={settings.launchAtStartup}
+            onChange={(launchAtStartup) => update({ launchAtStartup })}
           />
-        </label>
-        <label>
-          <span>Default language</span>
-          <input value={settings.defaultLanguage} onChange={(event) => update({ defaultLanguage: event.target.value })} />
-        </label>
+          <ToggleRow
+            label="Auto-copy result"
+            checked={settings.autoCopy}
+            onChange={(autoCopy) => update({ autoCopy })}
+          />
+          <ToggleRow
+            label="Auto-replace selection"
+            checked={settings.autoReplace}
+            onChange={(autoReplace) => update({ autoReplace })}
+          />
+        </div>
+
+        <div className="settings-divider" />
+
+        <div className="settings-section">
+          <h2>Shortcuts</h2>
+          <ShortcutRecorder label="Floating Window" value={settings.globalShortcut} onChange={(globalShortcut) => update({ globalShortcut })} />
+          <ShortcutRecorder label="Grammar" value={settings.grammarShortcut} onChange={(grammarShortcut) => update({ grammarShortcut })} />
+          <ShortcutRecorder
+            label="Professional"
+            value={settings.professionalShortcut}
+            onChange={(professionalShortcut) => update({ professionalShortcut })}
+          />
+        </div>
+
+        <div className="settings-divider" />
+
+        <div className="settings-section">
+          <h2>Appearance</h2>
+          <div className="theme-options" role="radiogroup" aria-label="Theme">
+            <span>Theme</span>
+            {[
+              ["dark", "Dark"],
+              ["system", "System"]
+            ].map(([value, label]) => (
+              <label key={value}>
+                <input
+                  type="radio"
+                  name="theme"
+                  value={value}
+                  checked={settings.theme === value}
+                  onChange={() => update({ theme: value as AppSettings["theme"] })}
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="settings-divider" />
+
+        <div className="settings-section privacy-section">
+          <h2>Privacy</h2>
+          <p>✓ Stored locally</p>
+          <p>✓ No analytics</p>
+          <p>✓ No cloud storage</p>
+        </div>
       </section>
     </div>
   );
+}
+
+function ShortcutRecorder({
+  label,
+  value,
+  onChange
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [recording, setRecording] = useState(false);
+
+  function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (!recording) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const shortcut = formatShortcut(event);
+    if (shortcut) {
+      onChange(shortcut);
+      setRecording(false);
+    }
+  }
+
+  return (
+    <div className="shortcut-recorder">
+      <div>
+        <span>{label}</span>
+        <small>Current: {value}</small>
+      </div>
+      <button
+        type="button"
+        className={clsx(recording && "recording")}
+        onClick={() => setRecording(true)}
+        onKeyDown={handleKeyDown}
+        onBlur={() => setRecording(false)}
+      >
+        {recording ? "Press shortcut" : "Change"}
+      </button>
+    </div>
+  );
+}
+
+function formatShortcut(event: KeyboardEvent) {
+  const key = normalizeShortcutKey(event.key);
+  if (!key) {
+    return "";
+  }
+
+  const parts = [
+    event.ctrlKey && "Ctrl",
+    event.altKey && "Alt",
+    event.shiftKey && "Shift",
+    event.metaKey && "Win",
+    key
+  ].filter(Boolean);
+
+  return parts.length > 1 ? parts.join(" + ") : "";
+}
+
+function normalizeShortcutKey(key: string) {
+  if (["Control", "Alt", "Shift", "Meta"].includes(key)) {
+    return "";
+  }
+  if (key === " ") {
+    return "Space";
+  }
+  if (key.length === 1) {
+    return key.toUpperCase();
+  }
+  if (key.startsWith("Arrow")) {
+    return key.replace("Arrow", "");
+  }
+  return key.length ? key[0].toUpperCase() + key.slice(1) : "";
 }
 
 function ToggleRow({

@@ -75,6 +75,8 @@ pub struct ProviderSettings {
     pub temperature: f32,
     pub max_tokens: u32,
     pub use_offline_fallback: bool,
+    #[serde(default)]
+    pub custom_prompt: String,
 }
 
 impl Default for ProviderSettings {
@@ -87,6 +89,7 @@ impl Default for ProviderSettings {
             temperature: 0.35,
             max_tokens: 700,
             use_offline_fallback: true,
+            custom_prompt: String::new(),
         }
     }
 }
@@ -100,6 +103,8 @@ pub struct AppSettings {
     pub auto_replace: bool,
     pub auto_copy: bool,
     pub default_language: String,
+    #[serde(default)]
+    pub custom_prompt: String,
     pub global_shortcut: String,
     pub grammar_shortcut: String,
     pub professional_shortcut: String,
@@ -115,6 +120,7 @@ impl Default for AppSettings {
             auto_replace: true,
             auto_copy: false,
             default_language: "English".to_string(),
+            custom_prompt: String::new(),
             global_shortcut: "Ctrl + Alt + Z".to_string(),
             grammar_shortcut: "Ctrl + 1".to_string(),
             professional_shortcut: "Ctrl + 2".to_string(),

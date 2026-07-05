@@ -5,7 +5,7 @@ use tauri::{AppHandle, Manager, State};
 use crate::{
     desktop,
     models::{AppSettings, PopupPayload, ProviderId, RewriteMode, RewriteRequest, RewriteResponse},
-    providers,
+    providers, shortcuts,
     state::AppState,
     text,
 };
@@ -72,10 +72,13 @@ pub fn get_settings(state: State<'_, AppState>) -> Result<AppSettings, String> {
 
 #[tauri::command]
 pub fn save_settings(
+    app: AppHandle,
     state: State<'_, AppState>,
     settings: AppSettings,
 ) -> Result<AppSettings, String> {
-    state.db.save_settings(&settings)
+    let saved = state.db.save_settings(&settings)?;
+    shortcuts::sync_registered_shortcuts(&app)?;
+    Ok(saved)
 }
 
 #[tauri::command]
@@ -222,8 +225,10 @@ pub async fn rewrite_inner(
         });
     }
 
+    let mut provider_settings = settings.provider.clone();
+    provider_settings.custom_prompt = settings.custom_prompt.clone();
     let provider_result =
-        providers::rewrite_with_provider(&state.client, &settings.provider, &request).await;
+        providers::rewrite_with_provider(&state.client, &provider_settings, &request).await;
     let (output, provider, used_offline_fallback) = match provider_result {
         Ok(Some(output)) => (output, settings.provider.provider.clone(), false),
         Ok(None) => (
@@ -261,13 +266,6 @@ pub async fn rewrite_inner(
         provider,
         used_offline_fallback,
     };
-
-    let _ = state.db.save_history(
-        &response.input,
-        &response.output,
-        &response.mode,
-        &response.provider,
-    );
 
     Ok(response)
 }

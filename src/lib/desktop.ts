@@ -23,12 +23,13 @@ export type ProviderSettings = {
 };
 
 export type AppSettings = {
-  theme: "dark" | "light";
+  theme: "dark" | "light" | "system";
   accentColor: string;
   launchAtStartup: boolean;
   autoReplace: boolean;
   autoCopy: boolean;
   defaultLanguage: string;
+  customPrompt: string;
   globalShortcut: string;
   grammarShortcut: string;
   professionalShortcut: string;
@@ -61,6 +62,7 @@ export const defaultSettings: AppSettings = {
   autoReplace: true,
   autoCopy: false,
   defaultLanguage: "English",
+  customPrompt: "",
   globalShortcut: "Ctrl + Alt + Z",
   grammarShortcut: "Ctrl + 1",
   professionalShortcut: "Ctrl + 2",

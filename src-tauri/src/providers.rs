@@ -21,7 +21,15 @@ pub async fn rewrite_with_provider(
         return Ok(None);
     }
 
-    let instruction = instruction_for(&request.mode, request.target_language.as_deref());
+    let default_instruction = instruction_for(&request.mode, request.target_language.as_deref());
+    let custom_instruction = settings.custom_prompt.trim();
+    let instruction = if custom_instruction.is_empty() {
+        default_instruction.to_string()
+    } else {
+        format!(
+            "{default_instruction}\n\nUser rewrite instructions:\n{custom_instruction}"
+        )
+    };
     let prompt = format!(
         "{instruction}\n\nRules:\n- Return only the rewritten text.\n- Preserve the user's meaning.\n- Do not add explanations.\n\nText:\n{}",
         request.input
