@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "CorteX",
+  "version": "1.0.0",
+  "identifier": "app.cortex.writer",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "CorteX",
+        "width": 1180,
+        "height": 640,
+        "minWidth": 860,
+        "minHeight": 520,
+        "center": true,
+        "decorations": true,
+        "transparent": false,
+        "resizable": true,
+        "visible": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/icon.ico"],
+    "category": "Productivity",
+    "shortDescription": "AI writing assistant for Windows",
+    "longDescription": "CorteX rewrites, improves, summarizes, translates, and replaces selected text from any Windows application."
+  }
+}
