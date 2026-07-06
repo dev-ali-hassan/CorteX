@@ -6,7 +6,7 @@ use std::{
 use arboard::Clipboard;
 use tauri::{
     AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalSize, WebviewUrl,
-    WebviewWindow, WebviewWindowBuilder,
+    Theme, WebviewWindow, WebviewWindowBuilder,
 };
 
 use crate::models::PopupPayload;
@@ -140,6 +140,7 @@ fn get_or_create_main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
         .decorations(true)
         .transparent(false)
         .resizable(true)
+        .theme(Some(Theme::Dark))
         .visible(false)
         .build()
         .map_err(|error| error.to_string())

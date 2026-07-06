@@ -305,11 +305,16 @@ kbd {
 }
 
 .workspace {
+  display: flex;
+  min-height: 0;
   min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
   padding: 76px 28px 58px 43px;
 }
 
 .workspace-header {
+  flex: 0 0 auto;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -357,10 +362,10 @@ kbd {
 
 .rewrite-surface {
   display: grid;
-  grid-template-rows: minmax(186px, auto) auto minmax(248px, 1fr) 55px;
-  gap: 26px;
+  grid-template-rows: minmax(170px, 1fr) auto minmax(170px, 1fr) 55px;
+  gap: 34px;
   height: calc(100vh - 161px);
-  min-height: 604px;
+  min-height: 0;
 }
 
 .text-panel,
@@ -399,7 +404,7 @@ kbd {
 .text-panel textarea {
   width: 100%;
   height: 100%;
-  min-height: 136px;
+  min-height: 170px;
   resize: none;
   border: 1px solid rgba(148, 163, 184, 0.24);
   border-radius: 12px;
@@ -415,11 +420,11 @@ kbd {
 }
 
 .mode-section {
-  padding: 21px 20px 19px;
+  padding: 17px 18px 16px;
 }
 
 .mode-section h2 {
-  margin: 0 0 16px;
+  margin: 0 0 12px;
   color: #fff;
   font-size: 18px;
   font-weight: 720;
@@ -433,7 +438,7 @@ kbd {
 
 .mode-tile {
   display: grid;
-  min-height: 108px;
+  min-height: 88px;
   place-items: center;
   gap: 11px;
   border: 1px solid rgba(148, 163, 184, 0.18);
@@ -695,7 +700,28 @@ kbd {
 .settings-shell {
   display: grid;
   align-content: start;
+  flex: 1 1 auto;
   gap: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 10px;
+  scrollbar-color: rgba(139, 92, 246, 0.72) rgba(7, 11, 19, 0.5);
+  scrollbar-gutter: stable;
+}
+
+.settings-shell::-webkit-scrollbar {
+  width: 10px;
+}
+
+.settings-shell::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(7, 11, 19, 0.42);
+}
+
+.settings-shell::-webkit-scrollbar-thumb {
+  border: 2px solid rgba(7, 11, 19, 0.42);
+  border-radius: 999px;
+  background: rgba(139, 92, 246, 0.76);
 }
 
 .settings-panel {
@@ -1250,10 +1276,10 @@ kbd {
   }
 
   .rewrite-surface {
-    grid-template-rows: 150px 112px minmax(210px, 1fr) 48px;
-    gap: 22px;
+    grid-template-rows: minmax(158px, 1fr) 96px minmax(158px, 1fr) 48px;
+    gap: 28px;
     height: calc(100vh - 132px);
-    min-height: 500px;
+    min-height: 0;
   }
 
   .text-panel {
@@ -1266,7 +1292,7 @@ kbd {
   }
 
   .text-panel textarea {
-    min-height: 96px;
+    min-height: 120px;
     border-radius: 10px;
     padding: 17px 18px;
     font-size: 17px;
@@ -1274,11 +1300,11 @@ kbd {
   }
 
   .mode-section {
-    padding: 17px 18px;
+    padding: 14px 16px;
   }
 
   .mode-section h2 {
-    margin-bottom: 14px;
+    margin-bottom: 10px;
     font-size: 14px;
   }
 
@@ -1288,7 +1314,7 @@ kbd {
   }
 
   .mode-tile {
-    min-height: 68px;
+    min-height: 56px;
     gap: 6px;
     border-radius: 10px;
   }
@@ -1579,8 +1605,8 @@ kbd {
   }
 
   .rewrite-surface {
-    grid-template-rows: 148px 104px 148px 42px;
-    gap: 10px;
+    grid-template-rows: 185px 88px 185px 42px;
+    gap: 18px;
     height: calc(100vh - 88px);
     min-height: 0;
     align-content: stretch;
@@ -1615,13 +1641,13 @@ kbd {
   }
 
   .mode-section {
-    padding: 10px 14px 12px;
+    padding: 8px 12px 10px;
     min-height: 0;
     overflow: hidden;
   }
 
   .mode-section h2 {
-    margin-bottom: 9px;
+    margin-bottom: 7px;
     font-size: 12px;
   }
 
@@ -1632,7 +1658,7 @@ kbd {
 
   .mode-tile {
     grid-template-rows: 20px 1fr;
-    min-height: 58px;
+    min-height: 48px;
     gap: 4px;
     border-radius: 9px;
     padding: 7px 5px 6px;
@@ -1800,8 +1826,8 @@ kbd {
   }
 
   .rewrite-surface {
-    grid-template-rows: 108px 92px 108px 36px;
-    gap: 7px;
+    grid-template-rows: 135px 78px 135px 36px;
+    gap: 12px;
     height: calc(100vh - 66px);
     min-height: 0;
     align-content: stretch;
@@ -1820,11 +1846,11 @@ kbd {
   }
 
   .mode-section {
-    padding: 8px 12px 9px;
+    padding: 7px 10px 8px;
   }
 
   .mode-section h2 {
-    margin-bottom: 7px;
+    margin-bottom: 5px;
   }
 
   .mode-grid {
@@ -1834,7 +1860,7 @@ kbd {
 
   .mode-tile {
     grid-template-rows: 18px 1fr;
-    min-height: 52px;
+    min-height: 42px;
     padding: 6px 4px 5px;
   }
 
@@ -1876,7 +1902,8 @@ kbd {
   }
 
   .rewrite-surface {
-    grid-template-rows: 120px 150px 120px 78px;
+    grid-template-rows: 150px 150px 150px 78px;
+    gap: 18px;
     height: calc(100vh - 78px);
     min-height: 0;
     overflow: hidden;

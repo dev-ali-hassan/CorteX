@@ -152,13 +152,6 @@ function App() {
           <span>{settings.theme === "system" ? "System" : settings.theme === "dark" ? "Dark" : "Light"}</span>
           <ChevronDown size={18} aria-hidden="true" />
         </button>
-        <div className="sidebar-footer">
-          <LogoMark small />
-          <span>
-            <strong>CorteX</strong>
-            <small>AI Writing Assistant</small>
-          </span>
-        </div>
       </aside>
 
       <section className="workspace" aria-labelledby="workspace-title">
@@ -167,13 +160,6 @@ function App() {
             <h1 id="workspace-title">{mainTitle}</h1>
             <p>{view === "rewrite" ? "Rewrite, improve, and perfect your text instantly." : viewSubtitle(view)}</p>
           </div>
-          {view === "rewrite" && (
-            <button className="ai-settings-button" type="button" onClick={() => setView("settings")}>
-              <Settings size={20} aria-hidden="true" />
-              <span>AI Settings</span>
-              <ChevronDown size={18} aria-hidden="true" />
-            </button>
-          )}
         </header>
 
         {view === "rewrite" && (
@@ -300,7 +286,6 @@ function QuickRewrite({
           <label id="input-label" htmlFor="input-text">
             Input
           </label>
-          <span>{input.length} characters</span>
         </div>
         <textarea
           id="input-text"
@@ -335,7 +320,6 @@ function QuickRewrite({
           <label id="output-label" htmlFor="output-text">
             Output
           </label>
-          <span>{output.length} characters</span>
         </div>
         <textarea id="output-text" value={output} readOnly />
         <button className="floating-copy" type="button" onClick={onCopy} aria-label="Copy output">
