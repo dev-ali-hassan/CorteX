@@ -369,6 +369,9 @@ function QuickRewrite({
   onReplace: () => void;
 }) {
   const selectedMode = rewriteModes.find((item) => item.id === mode);
+  const inputWords = countWords(input);
+  const outputWords = countWords(output);
+  const wordsChanged = Math.abs(outputWords - inputWords);
 
   return (
     <div className="rewrite-surface">
@@ -380,23 +383,28 @@ function QuickRewrite({
               Original text
             </label>
           </span>
-          <button className="ghost-tool" type="button" onClick={() => setInput("")}>
-            <Trash2 size={18} aria-hidden="true" />
-            <span>Clear</span>
-          </button>
         </header>
-        <textarea
-          id="input-text"
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          spellCheck
-          aria-describedby="rewrite-status"
-        />
+        <div className="editor-shell">
+          <textarea
+            id="input-text"
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            spellCheck
+            placeholder="Paste or type text to rewrite..."
+            aria-describedby="rewrite-status"
+          />
+        </div>
         <div className="input-meta-row">
           <span className="language-chip">
             <Globe2 size={18} aria-hidden="true" />
             English
           </span>
+          <span>{inputWords} words</span>
+          <span>{input.length} characters</span>
+          <button className="ghost-tool" type="button" onClick={() => setInput("")}>
+            <Trash2 size={18} aria-hidden="true" />
+            <span>Clear</span>
+          </button>
         </div>
       </section>
 
@@ -433,12 +441,18 @@ function QuickRewrite({
             {selectedMode?.label ?? "Rewrite"} ready
           </span>
         </header>
-        <textarea id="output-text" value={output} readOnly />
+        <div className="editor-shell">
+          <textarea id="output-text" value={output} readOnly placeholder="Your rewritten text will appear here..." />
+        </div>
         <div className="output-meta-row">
-          <span>
-            <CheckCircle2 size={18} aria-hidden="true" />
-            {status}
-          </span>
+          <div className="output-stats">
+            <span>
+              <CheckCircle2 size={18} aria-hidden="true" />
+              {status}
+            </span>
+            <span>1.2s</span>
+            <span>{wordsChanged} words changed</span>
+          </div>
           <div className="output-actions">
             <button className="secondary-action" type="button" onClick={onReplace}>
               <Replace size={21} aria-hidden="true" />
@@ -469,6 +483,10 @@ function QuickRewrite({
       </footer>
     </div>
   );
+}
+
+function countWords(value: string) {
+  return value.trim() ? value.trim().split(/\s+/).length : 0;
 }
 
 function modeCaption(mode: RewriteModeId) {
