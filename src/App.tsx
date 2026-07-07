@@ -369,9 +369,6 @@ function QuickRewrite({
   onReplace: () => void;
 }) {
   const selectedMode = rewriteModes.find((item) => item.id === mode);
-  const inputWords = countWords(input);
-  const outputWords = countWords(output);
-  const wordsChanged = Math.abs(outputWords - inputWords);
 
   return (
     <div className="rewrite-surface">
@@ -399,8 +396,6 @@ function QuickRewrite({
             <Globe2 size={18} aria-hidden="true" />
             English
           </span>
-          <span>{inputWords} words</span>
-          <span>{input.length} characters</span>
           <button className="ghost-tool" type="button" onClick={() => setInput("")}>
             <Trash2 size={18} aria-hidden="true" />
             <span>Clear</span>
@@ -422,7 +417,6 @@ function QuickRewrite({
             >
               <item.icon size={34} strokeWidth={2} aria-hidden="true" />
               <span>{item.label}</span>
-              <small>{modeCaption(item.id)}</small>
             </button>
           ))}
         </div>
@@ -451,7 +445,6 @@ function QuickRewrite({
               {status}
             </span>
             <span>1.2s</span>
-            <span>{wordsChanged} words changed</span>
           </div>
           <div className="output-actions">
             <button className="secondary-action" type="button" onClick={onReplace}>
@@ -483,24 +476,6 @@ function QuickRewrite({
       </footer>
     </div>
   );
-}
-
-function countWords(value: string) {
-  return value.trim() ? value.trim().split(/\s+/).length : 0;
-}
-
-function modeCaption(mode: RewriteModeId) {
-  const captions: Record<RewriteModeId, string> = {
-    fixGrammar: "Fix errors",
-    professional: "Formal tone",
-    friendly: "Casual tone",
-    shorter: "Concise",
-    translate: "Change language",
-    summarize: "Key points",
-    confident: "Stronger",
-    simplify: "Plain language"
-  };
-  return captions[mode];
 }
 
 function SettingsView({

@@ -563,16 +563,7 @@ kbd {
   max-width: 1180px;
   height: calc(100vh - 126px);
   min-height: 0;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 20px;
-  background:
-    linear-gradient(180deg, rgba(19, 25, 37, 0.86), rgba(10, 13, 18, 0.88)),
-    rgba(10, 13, 18, 0.88);
-  box-shadow:
-    0 24px 80px rgba(0, 0, 0, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  padding: 28px;
-  backdrop-filter: blur(14px);
+  overflow: hidden;
 }
 
 .text-panel,
@@ -2420,15 +2411,11 @@ kbd {
     gap: 24px;
     height: calc(100vh - 126px);
     overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 20px;
-    background:
-      linear-gradient(180deg, rgba(19, 25, 37, 0.86), rgba(10, 13, 18, 0.88)),
-      rgba(10, 13, 18, 0.88);
-    box-shadow:
-      0 24px 80px rgba(0, 0, 0, 0.22),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
-    padding: 28px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
   }
 
   .text-panel {
@@ -2474,6 +2461,7 @@ kbd {
   }
 
   .mode-tile {
+    grid-template-rows: 22px auto;
     min-height: 72px;
     gap: 4px;
     padding: 8px 6px 7px;
@@ -2503,7 +2491,7 @@ kbd {
     grid-template-rows: clamp(170px, 26vh, 205px) 92px clamp(168px, 22vh, 200px) 34px;
     gap: 16px;
     height: calc(100vh - 82px);
-    padding: 22px;
+    padding: 0;
   }
 
   .text-panel {
@@ -2529,6 +2517,7 @@ kbd {
   }
 
   .mode-tile {
+    grid-template-rows: 20px auto;
     min-height: 62px;
   }
 }
