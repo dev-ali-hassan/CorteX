@@ -3,13 +3,18 @@ import type { KeyboardEvent } from "react";
 import clsx from "clsx";
 import {
   ChevronDown,
-  ClipboardCopy,
+  CheckCircle2,
   Copy,
+  ChevronRight,
+  FileText,
+  Globe2,
   Keyboard,
-  Moon,
   RefreshCw,
   Replace,
   Settings,
+  ShieldCheck,
+  Sparkles,
+  Trash2,
   Wand2,
   X,
   Minus,
@@ -56,6 +61,7 @@ function App() {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [status, setStatus] = useState("Ready");
   const [loading, setLoading] = useState(false);
+  const [settingsJumpTarget, setSettingsJumpTarget] = useState<string | null>(null);
 
   useEffect(() => {
     getSettings()
@@ -68,6 +74,46 @@ function App() {
       }
     }).then((unlisten) => () => unlisten());
   }, []);
+
+  useEffect(() => {
+    if (view !== "settings" || !settingsJumpTarget) {
+      return;
+    }
+
+    let attempts = 0;
+    const timers: number[] = [];
+    const scrollToTarget = () => {
+      attempts += 1;
+      const target = document.getElementById(settingsJumpTarget);
+      const scroller = document.querySelector<HTMLElement>(".settings-shell");
+
+      if (target && scroller) {
+        const top = target.offsetTop - scroller.offsetTop;
+        scroller.scrollTo({ top: Math.max(0, top - 10), behavior: "smooth" });
+        setSettingsJumpTarget(null);
+        return;
+      }
+
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        setSettingsJumpTarget(null);
+        return;
+      }
+
+      if (attempts < 8) {
+        timers.push(window.setTimeout(scrollToTarget, 80));
+      } else {
+        setSettingsJumpTarget(null);
+      }
+    };
+
+    const frame = window.requestAnimationFrame(scrollToTarget);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      timers.forEach(window.clearTimeout);
+    };
+  }, [settingsJumpTarget, view]);
 
   async function runRewrite(nextMode = mode) {
     const text = input.trim();
@@ -117,11 +163,20 @@ function App() {
     rewrite: "Quick Rewrite",
     settings: "Settings"
   }[view];
+  const hasConnectedProvider =
+    settings.provider.provider === "offline" ||
+    Boolean(settings.provider.apiKey?.trim()) ||
+    settings.provider.provider === "ollama";
+
+  function openShortcutSettings() {
+    setSettingsJumpTarget("shortcuts-section");
+    setView("settings");
+  }
 
   return (
     <main className="desktop-window" aria-label="CorteX desktop app">
       <TitleControls />
-      <aside className="sidebar" data-tauri-drag-region>
+      <aside className="sidebar">
         <BrandBlock />
         <nav className="nav-list" aria-label="Primary">
           <NavButton
@@ -138,20 +193,48 @@ function App() {
           />
         </nav>
         <div className="sidebar-separator" />
-        <div className="shortcut-card">
-          <span className="shortcut-icon" aria-hidden="true">
-            <Keyboard size={26} />
+        <div className="sidebar-group-label">Shortcut</div>
+        <button
+          className="shortcut-card"
+          type="button"
+          aria-label="Open shortcut settings"
+          onClick={openShortcutSettings}
+        >
+          <span className="shortcut-card-main">
+            <span className="shortcut-icon" aria-hidden="true">
+              <Keyboard size={22} />
+            </span>
+            <strong>Quick Rewrite</strong>
+          </span>
+          <span className="shortcut-keys" aria-label={`Current shortcut ${settings.globalShortcut}`}>
+            {settings.globalShortcut.split("+").map((part, index, parts) => (
+              <span key={`${part}-${index}`}>
+                <kbd>{part.trim()}</kbd>
+                {index < parts.length - 1 && <b>+</b>}
+              </span>
+            ))}
+          </span>
+          <span className="shortcut-card-footer">
+            <small>Press anytime</small>
+            <ChevronRight size={18} aria-hidden="true" />
+          </span>
+        </button>
+        <div className="sidebar-separator" />
+        <div className="model-card">
+          <span className="model-icon" aria-hidden="true">
+            <Sparkles size={22} />
           </span>
           <span>
-            <strong>{settings.globalShortcut}</strong>
-            <small>Global Shortcut</small>
+            <small>AI Model</small>
+            <strong>{settings.provider.model || "GPT-4o"}</strong>
+            <em className={clsx(!hasConnectedProvider && "not-connected")}>
+              {hasConnectedProvider ? "Connected" : "Not connected"}
+            </em>
           </span>
         </div>
-        <button className="theme-button" type="button" aria-label="Theme menu">
-          <Moon size={24} aria-hidden="true" />
-          <span>{settings.theme === "system" ? "System" : settings.theme === "dark" ? "Dark" : "Light"}</span>
-          <ChevronDown size={18} aria-hidden="true" />
-        </button>
+        <div className="sidebar-version">
+          <span>v1.0.0</span>
+        </div>
       </aside>
 
       <section className="workspace" aria-labelledby="workspace-title">
@@ -196,7 +279,9 @@ function App() {
 }
 
 function viewSubtitle(view: ViewKey) {
-  return "Choose providers, shortcuts, and behavior for the desktop assistant.";
+  return view === "rewrite"
+    ? "Turn rough text into polished writing."
+    : "Choose providers, shortcuts, and behavior for the desktop assistant.";
 }
 
 function TitleControls() {
@@ -224,6 +309,10 @@ function BrandBlock() {
           <span>CorteX</span>
         </div>
         <small>AI Writing Assistant</small>
+        <span className="brand-status">
+          <i aria-hidden="true" />
+          Ready
+        </span>
       </div>
     </div>
   );
@@ -279,14 +368,23 @@ function QuickRewrite({
   onCopy: () => void;
   onReplace: () => void;
 }) {
+  const selectedMode = rewriteModes.find((item) => item.id === mode);
+
   return (
     <div className="rewrite-surface">
-      <section className="text-panel" aria-labelledby="input-label">
-        <div className="panel-heading">
-          <label id="input-label" htmlFor="input-text">
-            Input
-          </label>
-        </div>
+      <section className="text-panel original-panel" aria-labelledby="input-label">
+        <header className="rewrite-card-heading">
+          <span className="rewrite-heading-main">
+            <FileText size={20} aria-hidden="true" />
+            <label id="input-label" htmlFor="input-text">
+              Original text
+            </label>
+          </span>
+          <button className="ghost-tool" type="button" onClick={() => setInput("")}>
+            <Trash2 size={18} aria-hidden="true" />
+            <span>Clear</span>
+          </button>
+        </header>
         <textarea
           id="input-text"
           value={input}
@@ -294,6 +392,12 @@ function QuickRewrite({
           spellCheck
           aria-describedby="rewrite-status"
         />
+        <div className="input-meta-row">
+          <span className="language-chip">
+            <Globe2 size={18} aria-hidden="true" />
+            English
+          </span>
+        </div>
       </section>
 
       <section className="mode-section" aria-labelledby="mode-label">
@@ -310,44 +414,75 @@ function QuickRewrite({
             >
               <item.icon size={34} strokeWidth={2} aria-hidden="true" />
               <span>{item.label}</span>
+              <small>{modeCaption(item.id)}</small>
             </button>
           ))}
         </div>
       </section>
 
       <section className="text-panel output-panel" aria-labelledby="output-label">
-        <div className="panel-heading">
-          <label id="output-label" htmlFor="output-text">
-            Output
-          </label>
-        </div>
+        <header className="rewrite-card-heading">
+          <span className="rewrite-heading-main improved">
+            <Sparkles size={20} aria-hidden="true" />
+            <label id="output-label" htmlFor="output-text">
+              Improved text
+            </label>
+          </span>
+          <span className="success-chip">
+            <CheckCircle2 size={18} aria-hidden="true" />
+            {selectedMode?.label ?? "Rewrite"} ready
+          </span>
+        </header>
         <textarea id="output-text" value={output} readOnly />
-        <button className="floating-copy" type="button" onClick={onCopy} aria-label="Copy output">
-          <ClipboardCopy size={22} aria-hidden="true" />
-        </button>
+        <div className="output-meta-row">
+          <span>
+            <CheckCircle2 size={18} aria-hidden="true" />
+            {status}
+          </span>
+          <div className="output-actions">
+            <button className="secondary-action" type="button" onClick={onReplace}>
+              <Replace size={21} aria-hidden="true" />
+              <span>Replace</span>
+            </button>
+            <button className="primary-action" type="button" onClick={onCopy}>
+              <Copy size={23} aria-hidden="true" />
+              <span>Copy</span>
+            </button>
+          </div>
+        </div>
       </section>
 
       <footer className="action-row">
+        <div className="model-chip">
+          Model: GPT-4o
+          <ChevronDown size={16} aria-hidden="true" />
+        </div>
         <button className="secondary-action" type="button" onClick={onRewrite} disabled={loading}>
           <RefreshCw size={21} aria-hidden="true" />
-          <span>{loading ? "Rewriting" : "Rewrite"}</span>
+          <span>{loading ? "Rewriting" : "Rewrite Again"}</span>
           <kbd>Enter</kbd>
         </button>
         <p id="rewrite-status" role="status">
-          {status}
+          <ShieldCheck size={18} aria-hidden="true" />
+          Secure and private
         </p>
-        <button className="secondary-action" type="button" onClick={onReplace}>
-          <Replace size={21} aria-hidden="true" />
-          <span>Replace</span>
-          <kbd>Ctrl + Enter</kbd>
-        </button>
-        <button className="primary-action" type="button" onClick={onCopy}>
-          <Copy size={23} aria-hidden="true" />
-          <span>Copy</span>
-        </button>
       </footer>
     </div>
   );
+}
+
+function modeCaption(mode: RewriteModeId) {
+  const captions: Record<RewriteModeId, string> = {
+    fixGrammar: "Fix errors",
+    professional: "Formal tone",
+    friendly: "Casual tone",
+    shorter: "Concise",
+    translate: "Change language",
+    summarize: "Key points",
+    confident: "Stronger",
+    simplify: "Plain language"
+  };
+  return captions[mode];
 }
 
 function SettingsView({
@@ -378,7 +513,7 @@ function SettingsView({
   return (
     <div className="settings-shell">
       <section className="settings-panel settings-stack">
-        <div className="settings-section">
+        <div className="settings-section" id="shortcuts-section">
           <h2>AI</h2>
           <label>
             <span>Provider</span>
@@ -443,6 +578,12 @@ function SettingsView({
             value={settings.professionalShortcut}
             onChange={(professionalShortcut) => update({ professionalShortcut })}
           />
+          <ShortcutRecorder label="Friendly" value={settings.friendlyShortcut} onChange={(friendlyShortcut) => update({ friendlyShortcut })} />
+          <ShortcutRecorder label="Shorter" value={settings.shorterShortcut} onChange={(shorterShortcut) => update({ shorterShortcut })} />
+          <ShortcutRecorder label="Translate" value={settings.translateShortcut} onChange={(translateShortcut) => update({ translateShortcut })} />
+          <ShortcutRecorder label="Summarize" value={settings.summarizeShortcut} onChange={(summarizeShortcut) => update({ summarizeShortcut })} />
+          <ShortcutRecorder label="Confident" value={settings.confidentShortcut} onChange={(confidentShortcut) => update({ confidentShortcut })} />
+          <ShortcutRecorder label="Simplify" value={settings.simplifyShortcut} onChange={(simplifyShortcut) => update({ simplifyShortcut })} />
         </div>
 
         <div className="settings-divider" />

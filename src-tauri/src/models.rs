@@ -108,6 +108,18 @@ pub struct AppSettings {
     pub global_shortcut: String,
     pub grammar_shortcut: String,
     pub professional_shortcut: String,
+    #[serde(default = "default_friendly_shortcut")]
+    pub friendly_shortcut: String,
+    #[serde(default = "default_shorter_shortcut")]
+    pub shorter_shortcut: String,
+    #[serde(default = "default_translate_shortcut")]
+    pub translate_shortcut: String,
+    #[serde(default = "default_summarize_shortcut")]
+    pub summarize_shortcut: String,
+    #[serde(default = "default_confident_shortcut")]
+    pub confident_shortcut: String,
+    #[serde(default = "default_simplify_shortcut")]
+    pub simplify_shortcut: String,
     pub provider: ProviderSettings,
 }
 
@@ -124,9 +136,39 @@ impl Default for AppSettings {
             global_shortcut: "Ctrl + Alt + Z".to_string(),
             grammar_shortcut: "Ctrl + 1".to_string(),
             professional_shortcut: "Ctrl + 2".to_string(),
+            friendly_shortcut: default_friendly_shortcut(),
+            shorter_shortcut: default_shorter_shortcut(),
+            translate_shortcut: default_translate_shortcut(),
+            summarize_shortcut: default_summarize_shortcut(),
+            confident_shortcut: default_confident_shortcut(),
+            simplify_shortcut: default_simplify_shortcut(),
             provider: ProviderSettings::default(),
         }
     }
+}
+
+fn default_friendly_shortcut() -> String {
+    "Ctrl + 3".to_string()
+}
+
+fn default_shorter_shortcut() -> String {
+    "Ctrl + 4".to_string()
+}
+
+fn default_translate_shortcut() -> String {
+    "Ctrl + 5".to_string()
+}
+
+fn default_summarize_shortcut() -> String {
+    "Ctrl + 6".to_string()
+}
+
+fn default_confident_shortcut() -> String {
+    "Ctrl + 7".to_string()
+}
+
+fn default_simplify_shortcut() -> String {
+    "Ctrl + 8".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

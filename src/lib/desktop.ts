@@ -33,6 +33,12 @@ export type AppSettings = {
   globalShortcut: string;
   grammarShortcut: string;
   professionalShortcut: string;
+  friendlyShortcut: string;
+  shorterShortcut: string;
+  translateShortcut: string;
+  summarizeShortcut: string;
+  confidentShortcut: string;
+  simplifyShortcut: string;
   provider: ProviderSettings;
 };
 
@@ -66,6 +72,12 @@ export const defaultSettings: AppSettings = {
   globalShortcut: "Ctrl + Alt + Z",
   grammarShortcut: "Ctrl + 1",
   professionalShortcut: "Ctrl + 2",
+  friendlyShortcut: "Ctrl + 3",
+  shorterShortcut: "Ctrl + 4",
+  translateShortcut: "Ctrl + 5",
+  summarizeShortcut: "Ctrl + 6",
+  confidentShortcut: "Ctrl + 7",
+  simplifyShortcut: "Ctrl + 8",
   provider: {
     provider: "offline",
     model: "local-cleanup",

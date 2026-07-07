@@ -32,6 +32,36 @@ pub fn register(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     tauri::async_runtime::spawn(async move {
                         commands::run_direct_rewrite_shortcut(app, RewriteMode::Professional).await;
                     });
+                } else if shortcut_matches(shortcut, &settings.friendly_shortcut) {
+                    let app = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        commands::run_direct_rewrite_shortcut(app, RewriteMode::Friendly).await;
+                    });
+                } else if shortcut_matches(shortcut, &settings.shorter_shortcut) {
+                    let app = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        commands::run_direct_rewrite_shortcut(app, RewriteMode::Shorter).await;
+                    });
+                } else if shortcut_matches(shortcut, &settings.translate_shortcut) {
+                    let app = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        commands::run_direct_rewrite_shortcut(app, RewriteMode::Translate).await;
+                    });
+                } else if shortcut_matches(shortcut, &settings.summarize_shortcut) {
+                    let app = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        commands::run_direct_rewrite_shortcut(app, RewriteMode::Summarize).await;
+                    });
+                } else if shortcut_matches(shortcut, &settings.confident_shortcut) {
+                    let app = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        commands::run_direct_rewrite_shortcut(app, RewriteMode::Confident).await;
+                    });
+                } else if shortcut_matches(shortcut, &settings.simplify_shortcut) {
+                    let app = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        commands::run_direct_rewrite_shortcut(app, RewriteMode::Simplify).await;
+                    });
                 }
             })
             .build(),
@@ -56,6 +86,12 @@ pub fn sync_registered_shortcuts(app: &AppHandle) -> Result<(), String> {
         settings.global_shortcut,
         settings.grammar_shortcut,
         settings.professional_shortcut,
+        settings.friendly_shortcut,
+        settings.shorter_shortcut,
+        settings.translate_shortcut,
+        settings.summarize_shortcut,
+        settings.confident_shortcut,
+        settings.simplify_shortcut,
     ] {
         if let Some(shortcut) = parse_shortcut(&value) {
             if !shortcuts.contains(&shortcut) {
