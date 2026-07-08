@@ -12,7 +12,6 @@ import {
   RefreshCw,
   Replace,
   Settings,
-  ShieldCheck,
   Sparkles,
   Trash2,
   Wand2,
@@ -460,19 +459,11 @@ function QuickRewrite({
       </section>
 
       <footer className="action-row">
-        <div className="model-chip">
-          Model: GPT-4o
-          <ChevronDown size={16} aria-hidden="true" />
-        </div>
         <button className="secondary-action" type="button" onClick={onRewrite} disabled={loading}>
           <RefreshCw size={21} aria-hidden="true" />
           <span>{loading ? "Rewriting" : "Rewrite Again"}</span>
           <kbd>Enter</kbd>
         </button>
-        <p id="rewrite-status" role="status">
-          <ShieldCheck size={18} aria-hidden="true" />
-          Secure and private
-        </p>
       </footer>
     </div>
   );
