@@ -10,7 +10,6 @@ import {
   Globe2,
   Keyboard,
   RefreshCw,
-  Replace,
   Settings,
   Sparkles,
   Trash2,
@@ -60,6 +59,7 @@ function App() {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [status, setStatus] = useState("Ready");
   const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [settingsJumpTarget, setSettingsJumpTarget] = useState<string | null>(null);
 
   useEffect(() => {
@@ -122,6 +122,7 @@ function App() {
     }
 
     setLoading(true);
+    setCopied(false);
     setStatus("Rewriting");
     try {
       const response = await rewriteText({
@@ -147,7 +148,9 @@ function App() {
       return;
     }
     await copyText(output);
+    setCopied(true);
     setStatus("Copied");
+    window.setTimeout(() => setCopied(false), 2000);
   }
 
   async function handleReplace() {
@@ -166,6 +169,7 @@ function App() {
     settings.provider.provider === "offline" ||
     Boolean(settings.provider.apiKey?.trim()) ||
     settings.provider.provider === "ollama";
+  const activeTheme = settings.theme === "system" ? "dark" : settings.theme;
 
   function openShortcutSettings() {
     setSettingsJumpTarget("shortcuts-section");
@@ -173,7 +177,7 @@ function App() {
   }
 
   return (
-    <main className="desktop-window" aria-label="CorteX desktop app">
+    <main className="desktop-window" data-theme={activeTheme} aria-label="CorteX desktop app">
       <TitleControls />
       <aside className="sidebar">
         <BrandBlock />
@@ -251,6 +255,7 @@ function App() {
             mode={mode}
             loading={loading}
             status={status}
+            copied={copied}
             setInput={setInput}
             setMode={(nextMode) => {
               setMode(nextMode);
@@ -344,12 +349,18 @@ function NavButton({
   );
 }
 
+function countWords(value: string) {
+  const words = value.trim().match(/\S+/g);
+  return words ? words.length : 0;
+}
+
 function QuickRewrite({
   input,
   output,
   mode,
   loading,
   status,
+  copied,
   setInput,
   setMode,
   onRewrite,
@@ -361,6 +372,7 @@ function QuickRewrite({
   mode: RewriteModeId;
   loading: boolean;
   status: string;
+  copied: boolean;
   setInput: (value: string) => void;
   setMode: (value: RewriteModeId) => void;
   onRewrite: () => void;
@@ -368,6 +380,8 @@ function QuickRewrite({
   onReplace: () => void;
 }) {
   const selectedMode = rewriteModes.find((item) => item.id === mode);
+  const inputWords = countWords(input);
+  const outputWords = countWords(output);
 
   return (
     <div className="rewrite-surface">
@@ -395,6 +409,7 @@ function QuickRewrite({
             <Globe2 size={18} aria-hidden="true" />
             English
           </span>
+          <span className="word-count">{inputWords} words</span>
           <button className="ghost-tool" type="button" onClick={() => setInput("")}>
             <Trash2 size={18} aria-hidden="true" />
             <span>Clear</span>
@@ -434,8 +449,20 @@ function QuickRewrite({
             {selectedMode?.label ?? "Rewrite"} ready
           </span>
         </header>
-        <div className="editor-shell">
-          <textarea id="output-text" value={output} readOnly placeholder="Your rewritten text will appear here..." />
+        <div className={clsx("editor-shell", loading && "editor-shell-loading")}>
+          {loading ? (
+            <div className="rewrite-loader" role="status" aria-live="polite">
+              <span className="rewrite-loader-title">
+                <Sparkles size={18} aria-hidden="true" />
+                Rewriting...
+              </span>
+              <span className="rewrite-loader-bar" aria-hidden="true">
+                <span />
+              </span>
+            </div>
+          ) : (
+            <textarea id="output-text" value={output} readOnly placeholder="Your rewritten text will appear here..." />
+          )}
         </div>
         <div className="output-meta-row">
           <div className="output-stats">
@@ -444,15 +471,12 @@ function QuickRewrite({
               {status}
             </span>
             <span>1.2s</span>
+            <span className="word-count">{outputWords} words</span>
           </div>
           <div className="output-actions">
-            <button className="secondary-action" type="button" onClick={onReplace}>
-              <Replace size={21} aria-hidden="true" />
-              <span>Replace</span>
-            </button>
-            <button className="primary-action" type="button" onClick={onCopy}>
-              <Copy size={23} aria-hidden="true" />
-              <span>Copy</span>
+            <button className={clsx("primary-action", copied && "copied")} type="button" onClick={onCopy}>
+              {copied ? <CheckCircle2 size={20} aria-hidden="true" /> : <Copy size={23} aria-hidden="true" />}
+              <span>{copied ? "Copied" : "Copy"}</span>
             </button>
           </div>
         </div>
@@ -578,7 +602,8 @@ function SettingsView({
             <span>Theme</span>
             {[
               ["dark", "Dark"],
-              ["system", "System"]
+              ["light", "Light"],
+              ["purple", "Purple"]
             ].map(([value, label]) => (
               <label key={value}>
                 <input

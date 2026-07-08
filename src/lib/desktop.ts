@@ -23,7 +23,7 @@ export type ProviderSettings = {
 };
 
 export type AppSettings = {
-  theme: "dark" | "light" | "system";
+  theme: "dark" | "light" | "purple" | "system";
   accentColor: string;
   launchAtStartup: boolean;
   autoReplace: boolean;
