@@ -901,8 +901,13 @@ kbd {
 
 .input-meta-row {
   align-self: end;
+  flex-wrap: wrap;
   padding-top: 8px;
   font-size: 12px;
+}
+
+.file-input {
+  display: none;
 }
 
 .input-meta-row .language-chip {
@@ -982,12 +987,20 @@ kbd {
 
 .success-chip {
   gap: 8px;
-  border-radius: 8px;
+  min-height: 22px;
+  border-radius: 7px;
   background: rgba(34, 197, 94, 0.16);
   color: #9df58f;
-  padding: 5px 10px;
-  font-size: 14px;
+  padding: 2px 9px;
+  font-size: 12px;
   font-weight: 700;
+  line-height: 1;
+  transform: translateY(-3px);
+}
+
+.success-chip svg {
+  width: 15px;
+  height: 15px;
 }
 
 .floating-copy {

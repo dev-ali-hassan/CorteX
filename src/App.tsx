@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import type { KeyboardEvent } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent, KeyboardEvent } from "react";
 import clsx from "clsx";
 import {
   ChevronDown,
@@ -7,6 +7,7 @@ import {
   Copy,
   ChevronRight,
   FileText,
+  FileUp,
   Globe2,
   Keyboard,
   RefreshCw,
@@ -29,6 +30,7 @@ import {
   windowAction,
   type AppSettings
 } from "./lib/desktop";
+import { extractTextFromDocument } from "./lib/documentImport";
 import { defaultInput, defaultOutput, rewriteModes, type RewriteModeId } from "./data/modes";
 
 type ViewKey = "rewrite" | "settings";
@@ -161,12 +163,31 @@ function App() {
     setStatus("Replaced selected text");
   }
 
+  async function handleDocumentImport(file: File) {
+    setLoading(true);
+    setCopied(false);
+    setStatus("Importing document");
+    try {
+      const text = await extractTextFromDocument(file);
+      if (!text.trim()) {
+        setStatus("No readable text found");
+        return;
+      }
+      setInput(text);
+      setOutput("");
+      setStatus(`Imported ${file.name}`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Could not import file");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const mainTitle = {
     rewrite: "Quick Rewrite",
     settings: "Settings"
   }[view];
   const hasConnectedProvider =
-    settings.provider.provider === "offline" ||
     Boolean(settings.provider.apiKey?.trim()) ||
     settings.provider.provider === "ollama";
   const activeTheme = settings.theme === "system" ? "dark" : settings.theme;
@@ -264,6 +285,7 @@ function App() {
             onRewrite={() => runRewrite()}
             onCopy={handleCopy}
             onReplace={handleReplace}
+            onDocumentImport={handleDocumentImport}
           />
         )}
         {view === "settings" && (
@@ -365,7 +387,8 @@ function QuickRewrite({
   setMode,
   onRewrite,
   onCopy,
-  onReplace
+  onReplace,
+  onDocumentImport
 }: {
   input: string;
   output: string;
@@ -378,10 +401,21 @@ function QuickRewrite({
   onRewrite: () => void;
   onCopy: () => void;
   onReplace: () => void;
+  onDocumentImport: (file: File) => Promise<void>;
 }) {
   const selectedMode = rewriteModes.find((item) => item.id === mode);
   const inputWords = countWords(input);
   const outputWords = countWords(output);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    await onDocumentImport(file);
+    event.target.value = "";
+  }
 
   return (
     <div className="rewrite-surface">
@@ -410,6 +444,17 @@ function QuickRewrite({
             English
           </span>
           <span className="word-count">{inputWords} words</span>
+          <input
+            ref={fileInputRef}
+            className="file-input"
+            type="file"
+            accept=".txt,.md,.markdown,.csv,.json,.log,.rtf,.docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            onChange={handleFileChange}
+          />
+          <button className="ghost-tool" type="button" onClick={() => fileInputRef.current?.click()} disabled={loading}>
+            <FileUp size={18} aria-hidden="true" />
+            <span>Import file</span>
+          </button>
           <button className="ghost-tool" type="button" onClick={() => setInput("")}>
             <Trash2 size={18} aria-hidden="true" />
             <span>Clear</span>
