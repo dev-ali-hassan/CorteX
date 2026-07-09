@@ -11,6 +11,7 @@ import {
   Globe2,
   Keyboard,
   RefreshCw,
+  Search,
   Settings,
   Sparkles,
   Trash2,
@@ -187,9 +188,16 @@ function App() {
     rewrite: "Quick Rewrite",
     settings: "Settings"
   }[view];
+  const isOfflineModel =
+    settings.provider.provider === "offline" ||
+    settings.provider.model.trim().toLowerCase() === "local-cleanup";
   const hasConnectedProvider =
-    Boolean(settings.provider.apiKey?.trim()) ||
-    settings.provider.provider === "ollama";
+    !isOfflineModel &&
+    (Boolean(settings.provider.apiKey?.trim()) || settings.provider.provider === "ollama");
+  const sidebarProviderName = isOfflineModel
+    ? "No Provider Selected"
+    : providerLabels[settings.provider.provider] || "Custom Provider";
+  const sidebarProviderStatus = hasConnectedProvider ? "Connected" : isOfflineModel ? "Offline" : "Not Connected";
   const activeTheme = settings.theme === "system" ? "dark" : settings.theme;
 
   function openShortcutSettings() {
@@ -248,13 +256,14 @@ function App() {
           <span className="model-icon" aria-hidden="true">
             <Sparkles size={22} />
           </span>
-          <span>
-            <small>AI Model</small>
-            <strong>{settings.provider.model || "GPT-4o"}</strong>
+          <span className="model-card-copy">
+            <small>AI Provider</small>
+            <strong>{sidebarProviderName}</strong>
             <em className={clsx(!hasConnectedProvider && "not-connected")}>
-              {hasConnectedProvider ? "Connected" : "Not connected"}
+              {sidebarProviderStatus}
             </em>
           </span>
+          <ChevronRight className="model-card-arrow" size={17} aria-hidden="true" />
         </div>
         <div className="sidebar-version">
           <span>v1.0.0</span>
@@ -516,8 +525,8 @@ function QuickRewrite({
               {status}
             </span>
             <span>1.2s</span>
-            <span className="word-count">{outputWords} words</span>
           </div>
+          <span className="word-count output-word-count">{outputWords} words</span>
           <div className="output-actions">
             <button className={clsx("primary-action", copied && "copied")} type="button" onClick={onCopy}>
               {copied ? <CheckCircle2 size={20} aria-hidden="true" /> : <Copy size={23} aria-hidden="true" />}
@@ -545,7 +554,20 @@ function SettingsView({
   settings: AppSettings;
   onChange: (settings: AppSettings) => void;
 }) {
+  const [settingsSearch, setSettingsSearch] = useState("");
   const providerEntries = Object.entries(providerLabels) as Array<[AppSettings["provider"]["provider"], string]>;
+  const normalizedSearch = settingsSearch.trim().toLowerCase();
+  const sectionMatches = (keywords: string[]) =>
+    !normalizedSearch || keywords.some((keyword) => keyword.toLowerCase().includes(normalizedSearch));
+  const visibleSections = [
+    sectionMatches(["ai", "provider", "api key", "test connection", "gemini", "openai", "anthropic", "ollama"]),
+    sectionMatches(["general", "custom prompt", "startup", "auto copy", "auto replace", "behavior"]),
+    sectionMatches(["shortcuts", "floating window", "grammar", "professional", "friendly", "shorter", "translate", "summarize", "confident", "simplify"]),
+    sectionMatches(["appearance", "theme", "dark", "light", "purple"]),
+    sectionMatches(["privacy", "stored locally", "analytics", "cloud storage"])
+  ];
+  const [showAI, showGeneral, showShortcuts, showAppearance, showPrivacy] = visibleSections;
+  const hasLaterSection = (index: number) => visibleSections.slice(index + 1).some(Boolean);
 
   function update(next: Partial<AppSettings>) {
     onChange({ ...settings, ...next });
@@ -565,8 +587,17 @@ function SettingsView({
 
   return (
     <div className="settings-shell">
+      <label className="settings-search" aria-label="Search settings">
+        <Search size={18} aria-hidden="true" />
+        <input
+          value={settingsSearch}
+          placeholder="Search Settings..."
+          onChange={(event) => setSettingsSearch(event.target.value)}
+        />
+      </label>
       <section className="settings-panel settings-stack">
-        <div className="settings-section" id="shortcuts-section">
+        {showAI && (
+        <div className="settings-section">
           <h2>AI</h2>
           <label>
             <span>Provider</span>
@@ -589,9 +620,11 @@ function SettingsView({
             Test Connection
           </button>
         </div>
+        )}
 
-        <div className="settings-divider" />
+        {showAI && hasLaterSection(0) && <div className="settings-divider" />}
 
+        {showGeneral && (
         <div className="settings-section">
           <h2>General</h2>
           <label>
@@ -619,10 +652,12 @@ function SettingsView({
             onChange={(autoReplace) => update({ autoReplace })}
           />
         </div>
+        )}
 
-        <div className="settings-divider" />
+        {showGeneral && hasLaterSection(1) && <div className="settings-divider" />}
 
-        <div className="settings-section">
+        {showShortcuts && (
+        <div className="settings-section" id="shortcuts-section">
           <h2>Shortcuts</h2>
           <ShortcutRecorder label="Floating Window" value={settings.globalShortcut} onChange={(globalShortcut) => update({ globalShortcut })} />
           <ShortcutRecorder label="Grammar" value={settings.grammarShortcut} onChange={(grammarShortcut) => update({ grammarShortcut })} />
@@ -638,9 +673,11 @@ function SettingsView({
           <ShortcutRecorder label="Confident" value={settings.confidentShortcut} onChange={(confidentShortcut) => update({ confidentShortcut })} />
           <ShortcutRecorder label="Simplify" value={settings.simplifyShortcut} onChange={(simplifyShortcut) => update({ simplifyShortcut })} />
         </div>
+        )}
 
-        <div className="settings-divider" />
+        {showShortcuts && hasLaterSection(2) && <div className="settings-divider" />}
 
+        {showAppearance && (
         <div className="settings-section">
           <h2>Appearance</h2>
           <div className="theme-options" role="radiogroup" aria-label="Theme">
@@ -663,15 +700,24 @@ function SettingsView({
             ))}
           </div>
         </div>
+        )}
 
-        <div className="settings-divider" />
+        {showAppearance && hasLaterSection(3) && <div className="settings-divider" />}
 
+        {showPrivacy && (
         <div className="settings-section privacy-section">
           <h2>Privacy</h2>
-          <p>✓ Stored locally</p>
-          <p>✓ No analytics</p>
-          <p>✓ No cloud storage</p>
+          <p>Stored locally</p>
+          <p>No analytics</p>
+          <p>No cloud storage</p>
         </div>
+        )}
+        {!visibleSections.some(Boolean) && (
+          <div className="settings-empty-state">
+            <Search size={20} aria-hidden="true" />
+            <span>No settings found</span>
+          </div>
+        )}
       </section>
     </div>
   );
@@ -716,7 +762,14 @@ function ShortcutRecorder({
         onKeyDown={handleKeyDown}
         onBlur={() => setRecording(false)}
       >
-        {recording ? "Press shortcut" : "Change"}
+        {recording ? (
+          "Press shortcut"
+        ) : (
+          <>
+            <Keyboard size={16} aria-hidden="true" />
+            Edit
+          </>
+        )}
       </button>
     </div>
   );
