@@ -128,7 +128,7 @@ pub struct AppSettings {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            theme: "dark".to_string(),
+            theme: "system".to_string(),
             accent_color: "#8b5cf6".to_string(),
             launch_at_startup: false,
             minimize_to_tray: true,

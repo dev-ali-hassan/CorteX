@@ -23,7 +23,7 @@ export type ProviderSettings = {
 };
 
 export type AppSettings = {
-  theme: "dark" | "light" | "purple" | "system";
+  theme: "system" | "dark" | "light";
   accentColor: string;
   launchAtStartup: boolean;
   minimizeToTray: boolean;
@@ -64,7 +64,7 @@ export type PopupPayload = RewriteResponse & {
 };
 
 export const defaultSettings: AppSettings = {
-  theme: "dark",
+  theme: "system",
   accentColor: "#8b5cf6",
   launchAtStartup: false,
   minimizeToTray: true,
@@ -164,6 +164,10 @@ export async function setWindowTheme(theme: "light" | "dark") {
   await getCurrentWindow().setTheme(theme);
 }
 
+export async function testProviderConnection(settings: ProviderSettings) {
+  return callCommand<string>("test_provider_connection", { settings });
+}
+
 export function listenToPopupPayload(onPayload: (payload: PopupPayload) => void) {
   if (!isTauri()) {
     return Promise.resolve(() => undefined);
@@ -210,6 +214,10 @@ function mockCommand<T>(command: string, args?: Record<string, unknown>): Promis
       usedOfflineFallback: true,
       characterCount: output.length
     } as T);
+  }
+
+  if (command === "test_provider_connection") {
+    return Promise.reject(new Error("Provider testing is available in the desktop app."));
   }
 
   return Promise.resolve(undefined as T);

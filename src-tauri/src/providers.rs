@@ -1,4 +1,4 @@
-use reqwest::Client;
+use reqwest::{Client, Response};
 use serde_json::{json, Value};
 
 use crate::{
@@ -72,6 +72,97 @@ pub async fn rewrite_with_provider(
     Ok(Some(output))
 }
 
+pub async fn test_connection(client: &Client, settings: &ProviderSettings) -> Result<String, String> {
+    if settings.provider == ProviderId::Offline {
+        return Err("Select an AI provider first.".to_string());
+    }
+
+    if settings.provider != ProviderId::Ollama
+        && settings.api_key.as_deref().unwrap_or("").trim().is_empty()
+    {
+        return Err("Enter an API key before testing the connection.".to_string());
+    }
+
+    match settings.provider {
+        ProviderId::Openai | ProviderId::Openrouter => {
+            let default_endpoint = if settings.provider == ProviderId::Openai {
+                "https://api.openai.com/v1/models"
+            } else {
+                "https://openrouter.ai/api/v1/models"
+            };
+            let endpoint = settings
+                .endpoint
+                .as_deref()
+                .map(models_endpoint_from_openai_compatible)
+                .unwrap_or_else(|| default_endpoint.to_string());
+            ensure_success(
+                client
+                    .get(endpoint)
+                    .bearer_auth(settings.api_key.as_deref().unwrap_or_default())
+                    .send()
+                    .await
+                    .map_err(connection_error)?,
+            )
+            .await?;
+        }
+        ProviderId::Anthropic => {
+            let endpoint = settings
+                .endpoint
+                .as_deref()
+                .map(models_endpoint_from_anthropic)
+                .unwrap_or_else(|| "https://api.anthropic.com/v1/models".to_string());
+            ensure_success(
+                client
+                    .get(endpoint)
+                    .header("x-api-key", settings.api_key.as_deref().unwrap_or_default())
+                    .header("anthropic-version", "2023-06-01")
+                    .send()
+                    .await
+                    .map_err(connection_error)?,
+            )
+            .await?;
+        }
+        ProviderId::Gemini => {
+            let endpoint = format!(
+                "https://generativelanguage.googleapis.com/v1beta/models?key={}",
+                settings.api_key.as_deref().unwrap_or_default()
+            );
+            ensure_success(client.get(endpoint).send().await.map_err(connection_error)?).await?;
+        }
+        ProviderId::Ollama => {
+            let endpoint = settings
+                .endpoint
+                .as_deref()
+                .map(ollama_tags_endpoint)
+                .unwrap_or_else(|| "http://localhost:11434/api/tags".to_string());
+            let value = response_json(client.get(endpoint).send().await.map_err(connection_error)?).await?;
+            let configured_model = settings.model.trim();
+            if !configured_model.is_empty() {
+                let installed = value
+                    .get("models")
+                    .and_then(Value::as_array)
+                    .is_some_and(|models| {
+                        models.iter().any(|model| {
+                            let name = model.get("name").and_then(Value::as_str).unwrap_or_default();
+                            let model_id = model.get("model").and_then(Value::as_str).unwrap_or_default();
+                            name == configured_model
+                                || model_id == configured_model
+                                || name.split(':').next() == configured_model.split(':').next()
+                        })
+                    });
+                if !installed {
+                    return Err(format!(
+                        "Ollama is running, but model '{configured_model}' is not installed."
+                    ));
+                }
+            }
+        }
+        ProviderId::Offline => unreachable!(),
+    }
+
+    Ok("Connected".to_string())
+}
+
 async fn call_openai_compatible(
     client: &Client,
     settings: &ProviderSettings,
@@ -100,13 +191,7 @@ async fn call_openai_compatible(
         .await
         .map_err(|error| error.to_string())?;
 
-    parse_json_response(
-        response
-            .json::<Value>()
-            .await
-            .map_err(|error| error.to_string())?,
-        &["choices.0.message.content"],
-    )
+    parse_json_response(response_json(response).await?, &["choices.0.message.content"])
 }
 
 async fn call_anthropic(
@@ -137,13 +222,7 @@ async fn call_anthropic(
         .await
         .map_err(|error| error.to_string())?;
 
-    parse_json_response(
-        response
-            .json::<Value>()
-            .await
-            .map_err(|error| error.to_string())?,
-        &["content.0.text"],
-    )
+    parse_json_response(response_json(response).await?, &["content.0.text"])
 }
 
 async fn call_gemini(
@@ -184,13 +263,7 @@ async fn call_gemini(
         .await
         .map_err(|error| error.to_string())?;
 
-    parse_json_response(
-        response
-            .json::<Value>()
-            .await
-            .map_err(|error| error.to_string())?,
-        &["candidates.0.content.parts.0.text"],
-    )
+    parse_json_response(response_json(response).await?, &["candidates.0.content.parts.0.text"])
 }
 
 async fn call_ollama(
@@ -216,13 +289,68 @@ async fn call_ollama(
         .await
         .map_err(|error| error.to_string())?;
 
-    parse_json_response(
-        response
-            .json::<Value>()
-            .await
-            .map_err(|error| error.to_string())?,
-        &["response"],
-    )
+    parse_json_response(response_json(response).await?, &["response"])
+}
+
+async fn response_json(response: Response) -> Result<Value, String> {
+    let status = response.status();
+    let value = response
+        .json::<Value>()
+        .await
+        .map_err(|error| format!("Provider returned an unreadable response: {error}"))?;
+    if status.is_success() {
+        return Ok(value);
+    }
+
+    let message = value
+        .pointer("/error/message")
+        .and_then(Value::as_str)
+        .or_else(|| value.get("error").and_then(Value::as_str))
+        .unwrap_or("The provider rejected the connection request.");
+    Err(format!("{} ({status})", message.trim()))
+}
+
+async fn ensure_success(response: Response) -> Result<(), String> {
+    response_json(response).await.map(|_| ())
+}
+
+fn connection_error(error: reqwest::Error) -> String {
+    if error.is_timeout() {
+        "Connection timed out. Check the provider address and try again.".to_string()
+    } else if error.is_connect() {
+        "Could not reach the provider. Check that it is running and the address is correct.".to_string()
+    } else {
+        format!("Connection failed: {error}")
+    }
+}
+
+fn models_endpoint_from_openai_compatible(endpoint: &str) -> String {
+    let endpoint = endpoint.trim_end_matches('/');
+    if let Some(prefix) = endpoint.strip_suffix("/chat/completions") {
+        format!("{prefix}/models")
+    } else {
+        format!("{endpoint}/models")
+    }
+}
+
+fn models_endpoint_from_anthropic(endpoint: &str) -> String {
+    let endpoint = endpoint.trim_end_matches('/');
+    if let Some(prefix) = endpoint.strip_suffix("/messages") {
+        format!("{prefix}/models")
+    } else {
+        format!("{endpoint}/models")
+    }
+}
+
+fn ollama_tags_endpoint(endpoint: &str) -> String {
+    let endpoint = endpoint.trim_end_matches('/');
+    if let Some(prefix) = endpoint.strip_suffix("/api/generate") {
+        format!("{prefix}/api/tags")
+    } else if endpoint.ends_with("/api/tags") {
+        endpoint.to_string()
+    } else {
+        format!("{endpoint}/api/tags")
+    }
 }
 
 fn parse_json_response(value: Value, paths: &[&str]) -> Result<String, String> {
@@ -252,4 +380,33 @@ fn read_path<'a>(value: &'a Value, path: &str) -> Option<&'a str> {
         }
     }
     current.as_str()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{models_endpoint_from_anthropic, models_endpoint_from_openai_compatible, ollama_tags_endpoint};
+
+    #[test]
+    fn derives_openai_compatible_models_endpoint() {
+        assert_eq!(
+            models_endpoint_from_openai_compatible("https://api.example.com/v1/chat/completions"),
+            "https://api.example.com/v1/models"
+        );
+    }
+
+    #[test]
+    fn derives_anthropic_models_endpoint() {
+        assert_eq!(
+            models_endpoint_from_anthropic("https://api.anthropic.com/v1/messages"),
+            "https://api.anthropic.com/v1/models"
+        );
+    }
+
+    #[test]
+    fn derives_ollama_tags_endpoint() {
+        assert_eq!(
+            ollama_tags_endpoint("http://localhost:11434/api/generate"),
+            "http://localhost:11434/api/tags"
+        );
+    }
 }

@@ -20,7 +20,10 @@ import {
   X,
   Minus,
   Square,
-  Power
+  Power,
+  Monitor,
+  Moon,
+  Sun
 } from "lucide-react";
 import {
   copyText,
@@ -31,6 +34,7 @@ import {
   rewriteText,
   saveSettings,
   setWindowTheme,
+  testProviderConnection,
   windowAction,
   type AppSettings
 } from "./lib/desktop";
@@ -38,6 +42,7 @@ import { extractTextFromDocument } from "./lib/documentImport";
 import { defaultInput, defaultOutput, rewriteModes, type RewriteModeId } from "./data/modes";
 
 type ViewKey = "rewrite" | "settings";
+type ProviderConnectionState = "disconnected" | "checking" | "connected" | "error";
 
 const visibleRewriteModes = rewriteModes.filter(
   (item) => item.id !== "shorter" && item.id !== "confident"
@@ -71,12 +76,50 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [settingsJumpTarget, setSettingsJumpTarget] = useState<string | null>(null);
+  const [providerConnection, setProviderConnection] = useState<ProviderConnectionState>("disconnected");
+  const [providerConnectionMessage, setProviderConnectionMessage] = useState("Select and test a provider.");
+  const providerCheckId = useRef(0);
+  const [systemPrefersDark, setSystemPrefersDark] = useState(() =>
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  );
+
+  useEffect(() => {
+    const colorScheme = window.matchMedia("(prefers-color-scheme: dark)");
+    const syncSystemTheme = () => setSystemPrefersDark(colorScheme.matches);
+
+    syncSystemTheme();
+    colorScheme.addEventListener("change", syncSystemTheme);
+    return () => colorScheme.removeEventListener("change", syncSystemTheme);
+  }, []);
+
+  useEffect(() => {
+    if (
+      settings.provider.provider === "offline" ||
+      settings.provider.model.trim().toLowerCase() === "local-cleanup"
+    ) {
+      setProviderConnection("disconnected");
+      setProviderConnectionMessage("Select an AI provider to connect.");
+    } else {
+      setProviderConnection("checking");
+      setProviderConnectionMessage("Checking the provider connection...");
+    }
+    const timer = window.setTimeout(() => {
+      void verifyProviderConnection(settings.provider);
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [
+    settings.provider.provider,
+    settings.provider.model,
+    settings.provider.apiKey,
+    settings.provider.endpoint
+  ]);
 
   useEffect(() => {
     getSettings()
       .then((value) => {
         if (value && typeof value === "object") {
-          setSettings(value);
+          const theme = ["system", "dark", "light"].includes(value.theme) ? value.theme : "system";
+          setSettings({ ...value, theme });
         }
       })
       .catch(() => setSettings(defaultSettings));
@@ -203,14 +246,18 @@ function App() {
   const isOfflineModel =
     settings.provider.provider === "offline" ||
     settings.provider.model.trim().toLowerCase() === "local-cleanup";
-  const hasConnectedProvider =
-    !isOfflineModel &&
-    (Boolean(settings.provider.apiKey?.trim()) || settings.provider.provider === "ollama");
-  const sidebarProviderName = !hasConnectedProvider
-    ? "Custom API"
+  const hasConnectedProvider = !isOfflineModel && providerConnection === "connected";
+  const sidebarProviderName = isOfflineModel
+    ? "No Provider Selected"
     : providerLabels[settings.provider.provider] || "Custom Provider";
-  const sidebarProviderStatus = hasConnectedProvider ? "Connected" : "Not Connected";
-  const activeTheme = ["dark", "light", "purple"].includes(settings.theme) ? settings.theme : "dark";
+  const sidebarProviderStatus = {
+    disconnected: "Not Connected",
+    checking: "Checking...",
+    connected: "Connected",
+    error: "Connection Failed"
+  }[providerConnection];
+  const savedTheme = ["system", "dark", "light"].includes(settings.theme) ? settings.theme : "system";
+  const activeTheme = savedTheme === "system" ? (systemPrefersDark ? "dark" : "light") : savedTheme;
 
   useEffect(() => {
     const windowTheme = activeTheme === "light" ? "light" : "dark";
@@ -234,6 +281,33 @@ function App() {
     void saveSettings(nextSettings)
       .then(() => setStatus("Theme saved"))
       .catch(() => setStatus("Theme saved locally"));
+  }
+
+  async function verifyProviderConnection(providerSettings = settings.provider) {
+    const checkId = ++providerCheckId.current;
+    if (
+      providerSettings.provider === "offline" ||
+      providerSettings.model.trim().toLowerCase() === "local-cleanup"
+    ) {
+      setProviderConnection("disconnected");
+      setProviderConnectionMessage("Select an AI provider to connect.");
+      return;
+    }
+
+    setProviderConnection("checking");
+    setProviderConnectionMessage("Checking the provider connection...");
+    try {
+      await testProviderConnection(providerSettings);
+      if (providerCheckId.current === checkId) {
+        setProviderConnection("connected");
+        setProviderConnectionMessage("Connection verified successfully.");
+      }
+    } catch (error) {
+      if (providerCheckId.current === checkId) {
+        setProviderConnection("error");
+        setProviderConnectionMessage(error instanceof Error ? error.message : "Could not connect to the provider.");
+      }
+    }
   }
 
   return (
@@ -295,7 +369,7 @@ function App() {
           <span className="model-card-copy">
             <small>AI Provider</small>
             <strong>{sidebarProviderName}</strong>
-            <em className={clsx(!hasConnectedProvider && "not-connected")}>
+            <em className={clsx(!hasConnectedProvider && "not-connected", providerConnection === "error" && "connection-error")}>
               {sidebarProviderStatus}
             </em>
           </span>
@@ -337,6 +411,9 @@ function App() {
         {view === "settings" && (
           <SettingsView
             settings={settings}
+            providerConnection={providerConnection}
+            providerConnectionMessage={providerConnectionMessage}
+            onTestConnection={() => verifyProviderConnection(settings.provider)}
             onThemeChange={handleThemeChange}
             onChange={async (nextSettings) => {
               setSettings(nextSettings);
@@ -464,6 +541,7 @@ function QuickRewrite({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [customPromptOpen, setCustomPromptOpen] = useState(false);
   const [customInstruction, setCustomInstruction] = useState("");
+  const [customPromptActive, setCustomPromptActive] = useState(false);
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -479,8 +557,23 @@ function QuickRewrite({
     if (!instruction) {
       return;
     }
+    setCustomPromptActive(true);
     setCustomPromptOpen(false);
     await onCustomRewrite(instruction);
+  }
+
+  function handleModeSelect(nextMode: RewriteModeId) {
+    setCustomPromptActive(false);
+    setMode(nextMode);
+  }
+
+  function handleRewriteAgain() {
+    const instruction = customInstruction.trim();
+    if (customPromptActive && instruction) {
+      void onCustomRewrite(instruction);
+      return;
+    }
+    onRewrite();
   }
 
   return (
@@ -533,11 +626,11 @@ function QuickRewrite({
         <div className="mode-grid">
           {visibleRewriteModes.map((item) => (
             <button
-              className={clsx("mode-tile", mode === item.id && "selected")}
+              className={clsx("mode-tile", !customPromptActive && mode === item.id && "selected")}
               type="button"
               key={item.id}
-              onClick={() => setMode(item.id)}
-              aria-pressed={mode === item.id}
+              onClick={() => handleModeSelect(item.id)}
+              aria-pressed={!customPromptActive && mode === item.id}
               title={item.description}
             >
               <item.icon size={34} strokeWidth={2} aria-hidden="true" />
@@ -545,10 +638,11 @@ function QuickRewrite({
             </button>
           ))}
           <button
-            className={clsx("mode-tile custom-prompt-tile", customPromptOpen && "selected")}
+            className={clsx("mode-tile custom-prompt-tile", (customPromptOpen || customPromptActive) && "selected")}
             type="button"
             onClick={() => setCustomPromptOpen(true)}
             aria-expanded={customPromptOpen}
+            aria-pressed={customPromptActive}
             title="Rewrite with your own AI instruction"
           >
             <Settings size={34} strokeWidth={2} aria-hidden="true" />
@@ -611,7 +705,7 @@ function QuickRewrite({
           </span>
           <span className="success-chip">
             <CheckCircle2 size={18} aria-hidden="true" />
-            {selectedMode?.label ?? "Rewrite"} ready
+            {customPromptActive ? "Custom Prompt" : selectedMode?.label ?? "Rewrite"} ready
           </span>
         </header>
         <div className={clsx("editor-shell", loading && "editor-shell-loading")}>
@@ -648,7 +742,7 @@ function QuickRewrite({
       </section>
 
       <footer className="action-row">
-        <button className="secondary-action" type="button" onClick={onRewrite} disabled={loading}>
+        <button className="secondary-action" type="button" onClick={handleRewriteAgain} disabled={loading}>
           <RefreshCw size={21} aria-hidden="true" />
           <span>{loading ? "Rewriting" : "Rewrite Again"}</span>
           <kbd>Enter</kbd>
@@ -660,10 +754,16 @@ function QuickRewrite({
 
 function SettingsView({
   settings,
+  providerConnection,
+  providerConnectionMessage,
+  onTestConnection,
   onChange,
   onThemeChange
 }: {
   settings: AppSettings;
+  providerConnection: ProviderConnectionState;
+  providerConnectionMessage: string;
+  onTestConnection: () => Promise<void>;
   onChange: (settings: AppSettings) => void;
   onThemeChange: (theme: AppSettings["theme"]) => void;
 }) {
@@ -676,7 +776,7 @@ function SettingsView({
     sectionMatches(["ai", "provider", "api key", "test connection", "gemini", "openai", "anthropic", "ollama"]),
     sectionMatches(["general", "custom prompt", "startup", "auto copy", "auto replace", "behavior"]),
     sectionMatches(["shortcuts", "floating window", "grammar", "professional", "friendly", "shorter", "translate", "summarize", "confident", "simplify"]),
-    sectionMatches(["appearance", "theme", "dark", "light", "purple"]),
+    sectionMatches(["appearance", "theme", "dark", "light", "system", "windows", "recommended"]),
     sectionMatches(["privacy", "stored locally", "analytics", "cloud storage"])
   ];
   const [showAI, showGeneral, showShortcuts, showAppearance, showPrivacy] = visibleSections;
@@ -727,11 +827,25 @@ function SettingsView({
           </label>
           <label>
             <span>API Key</span>
-            <input value={settings.provider.apiKey?.trim() ? "************" : "Not connected"} readOnly />
+            <input
+              type="password"
+              value={settings.provider.apiKey ?? ""}
+              placeholder={settings.provider.provider === "ollama" ? "Not required for local Ollama" : "Enter API key"}
+              autoComplete="off"
+              onChange={(event) => updateProvider({ apiKey: event.target.value })}
+            />
           </label>
-          <button className="test-connection-button" type="button">
-            Test Connection
+          <button
+            className="test-connection-button"
+            type="button"
+            onClick={() => void onTestConnection()}
+            disabled={providerConnection === "checking"}
+          >
+            {providerConnection === "checking" ? "Testing..." : "Test Connection"}
           </button>
+          <p className={clsx("provider-test-status", providerConnection)} role="status">
+            {providerConnectionMessage}
+          </p>
         </div>
         )}
 
@@ -803,10 +917,16 @@ function SettingsView({
           <div className="theme-options" role="radiogroup" aria-label="Theme">
             <span className="theme-options-label">Theme</span>
             {[
-              ["dark", "Dark"],
-              ["light", "Light"],
-              ["purple", "Purple"]
-            ].map(([value, label]) => (
+              { value: "dark", label: "Dark", description: "Always use dark appearance.", icon: Moon },
+              { value: "light", label: "Light", description: "Always use light appearance.", icon: Sun },
+              {
+                value: "system",
+                label: "System",
+                description: "Automatically follows your Windows appearance.",
+                icon: Monitor,
+                recommended: true
+              }
+            ].map(({ value, label, description, icon: ThemeIcon, recommended }) => (
               <button
                 className={clsx("theme-choice", settings.theme === value && "selected")}
                 key={value}
@@ -823,7 +943,12 @@ function SettingsView({
                     <i />
                   </span>
                 </span>
-                <span className="theme-choice-label">{label}</span>
+                <span className="theme-choice-heading">
+                  <ThemeIcon size={16} aria-hidden="true" />
+                  <span className="theme-choice-label">{label}</span>
+                  {recommended && <small>Recommended</small>}
+                </span>
+                <span className="theme-choice-description">{description}</span>
               </button>
             ))}
           </div>

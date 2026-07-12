@@ -4,7 +4,7 @@ use tauri::{AppHandle, Manager, State};
 
 use crate::{
     desktop,
-    models::{AppSettings, PopupPayload, ProviderId, RewriteMode, RewriteRequest, RewriteResponse},
+    models::{AppSettings, PopupPayload, ProviderId, ProviderSettings, RewriteMode, RewriteRequest, RewriteResponse},
     providers, shortcuts,
     state::AppState,
     text,
@@ -80,6 +80,14 @@ pub fn save_settings(
     let saved = state.db.save_settings(&settings)?;
     shortcuts::sync_registered_shortcuts(&app)?;
     Ok(saved)
+}
+
+#[tauri::command]
+pub async fn test_provider_connection(
+    state: State<'_, AppState>,
+    settings: ProviderSettings,
+) -> Result<String, String> {
+    providers::test_connection(&state.client, &settings).await
 }
 
 #[tauri::command]
