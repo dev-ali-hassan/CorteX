@@ -30,6 +30,7 @@ import {
   replaceSelectedText,
   rewriteText,
   saveSettings,
+  setWindowTheme,
   windowAction,
   type AppSettings
 } from "./lib/desktop";
@@ -210,6 +211,12 @@ function App() {
     : providerLabels[settings.provider.provider] || "Custom Provider";
   const sidebarProviderStatus = hasConnectedProvider ? "Connected" : "Not Connected";
   const activeTheme = ["dark", "light", "purple"].includes(settings.theme) ? settings.theme : "dark";
+
+  useEffect(() => {
+    const windowTheme = activeTheme === "light" ? "light" : "dark";
+    document.documentElement.style.colorScheme = windowTheme;
+    void setWindowTheme(windowTheme).catch(() => undefined);
+  }, [activeTheme]);
 
   function openShortcutSettings() {
     setSettingsJumpTarget("shortcuts-section");

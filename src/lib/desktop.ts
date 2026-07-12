@@ -156,6 +156,14 @@ export async function windowAction(action: "minimize" | "maximize" | "close") {
   }
 }
 
+export async function setWindowTheme(theme: "light" | "dark") {
+  if (!isTauri()) {
+    return;
+  }
+
+  await getCurrentWindow().setTheme(theme);
+}
+
 export function listenToPopupPayload(onPayload: (payload: PopupPayload) => void) {
   if (!isTauri()) {
     return Promise.resolve(() => undefined);

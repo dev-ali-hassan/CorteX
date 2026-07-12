@@ -3492,3 +3492,453 @@ kbd {
   background: linear-gradient(135deg, #a855f7 0%, #7c3aed 55%, #5b21b6 100%);
   box-shadow: 0 18px 34px rgba(168, 85, 247, 0.28);
 }
+
+/* Light theme is an independent visual system, not an inversion of dark mode. */
+.desktop-window[data-theme="light"] {
+  --bg: #f7f8fc;
+  --bg-deep: #f3f5f8;
+  --panel: #ffffff;
+  --panel-solid: #ffffff;
+  --panel-soft: #f3f5f8;
+  --border: #e6eaf0;
+  --border-strong: #d9e2ec;
+  --text: #111827;
+  --muted: #6b7280;
+  --muted-2: #9ca3af;
+  --accent: #6d5df6;
+  --accent-strong: #5b4cf0;
+  --accent-blue: #5b5bd6;
+  --accent-cyan: #5b5bd6;
+  --green: #027a48;
+  color: #111827;
+  background: #f7f8fc;
+}
+
+.desktop-window[data-theme="light"] .workspace,
+.desktop-window[data-theme="light"] .settings-shell {
+  color: #111827;
+  background: #f7f8fc;
+}
+
+.desktop-window[data-theme="light"] .sidebar {
+  border-right: 1px solid #e8ecf2;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.desktop-window[data-theme="light"] .logo-mark::before {
+  background: rgba(109, 93, 246, 0.12);
+}
+
+.desktop-window[data-theme="light"] .logo-mark::after {
+  background: rgba(91, 91, 214, 0.08);
+}
+
+.desktop-window[data-theme="light"] .logo-mark img {
+  filter: drop-shadow(0 3px 8px rgba(67, 56, 202, 0.12));
+}
+
+.desktop-window[data-theme="light"] .brand-name,
+.desktop-window[data-theme="light"] .brand-status,
+.desktop-window[data-theme="light"] .workspace-header h1,
+.desktop-window[data-theme="light"] .workspace-header p,
+.desktop-window[data-theme="light"] .sidebar-version {
+  color: #111827;
+}
+
+.desktop-window[data-theme="light"] .brand-block small,
+.desktop-window[data-theme="light"] .shortcut-card small,
+.desktop-window[data-theme="light"] .model-card small,
+.desktop-window[data-theme="light"] .sidebar-group-label {
+  color: #6b7280;
+}
+
+.desktop-window[data-theme="light"] .brand-status i,
+.desktop-window[data-theme="light"] .model-card em::before {
+  box-shadow: none;
+}
+
+.desktop-window[data-theme="light"] .sidebar-separator {
+  background: #e8ecf2;
+}
+
+.desktop-window[data-theme="light"] .nav-button {
+  border-color: transparent;
+  background: transparent;
+  color: #4b5563;
+  box-shadow: none;
+}
+
+.desktop-window[data-theme="light"] .nav-button svg {
+  color: #6b7280;
+}
+
+.desktop-window[data-theme="light"] .nav-button:hover {
+  border-color: #e6eaf0;
+  background: #f3f5f8;
+  color: #111827;
+}
+
+.desktop-window[data-theme="light"] .nav-button.active {
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  box-shadow: none;
+  color: #4338ca;
+}
+
+.desktop-window[data-theme="light"] .nav-button.active svg {
+  color: #5b5bd6;
+}
+
+.desktop-window[data-theme="light"] .shortcut-card,
+.desktop-window[data-theme="light"] .model-card {
+  border: 1px solid #e6eaf0;
+  background: #ffffff;
+  color: #374151;
+  box-shadow: 0 2px 10px rgba(16, 24, 40, 0.05);
+}
+
+.desktop-window[data-theme="light"] .shortcut-card:hover,
+.desktop-window[data-theme="light"] .model-card:hover {
+  border-color: #d9e2ec;
+  background: #f9fafb;
+  box-shadow: 0 6px 18px rgba(16, 24, 40, 0.06);
+}
+
+.desktop-window[data-theme="light"] .shortcut-card strong,
+.desktop-window[data-theme="light"] .model-card strong {
+  color: #111827;
+}
+
+.desktop-window[data-theme="light"] .shortcut-icon {
+  background: #eef2ff;
+  color: #5b5bd6;
+}
+
+.desktop-window[data-theme="light"] .shortcut-keys kbd {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.desktop-window[data-theme="light"] .model-icon {
+  border-color: #d9e2ec;
+  background: #f3f5f8;
+  color: #5b5bd6;
+  box-shadow: none;
+}
+
+.desktop-window[data-theme="light"] .model-card em {
+  color: #175cd3;
+}
+
+.desktop-window[data-theme="light"] .model-card em.not-connected,
+.desktop-window[data-theme="light"] .model-card-arrow {
+  color: #6b7280;
+}
+
+.desktop-window[data-theme="light"] .text-panel,
+.desktop-window[data-theme="light"] .mode-section,
+.desktop-window[data-theme="light"] .content-surface {
+  border: 1px solid #e6eaf0;
+  background: #ffffff;
+  box-shadow: 0 2px 10px rgba(16, 24, 40, 0.05);
+}
+
+.desktop-window[data-theme="light"] .text-panel:hover {
+  border-color: #d9e2ec;
+  box-shadow: 0 6px 18px rgba(16, 24, 40, 0.06);
+}
+
+.desktop-window[data-theme="light"] .text-panel::before {
+  background: #6d5df6;
+}
+
+.desktop-window[data-theme="light"] .output-panel::before {
+  background: #12b76a;
+}
+
+.desktop-window[data-theme="light"] .rewrite-card-heading,
+.desktop-window[data-theme="light"] .mode-section h2,
+.desktop-window[data-theme="light"] .language-chip,
+.desktop-window[data-theme="light"] .word-count,
+.desktop-window[data-theme="light"] .output-stats,
+.desktop-window[data-theme="light"] .action-row p {
+  color: #6b7280;
+}
+
+.desktop-window[data-theme="light"] .rewrite-heading-main {
+  color: #5b5bd6;
+}
+
+.desktop-window[data-theme="light"] .rewrite-heading-main.improved {
+  color: #027a48;
+}
+
+.desktop-window[data-theme="light"] .editor-shell {
+  border: 1px solid #d9e2ec;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.desktop-window[data-theme="light"] .editor-shell:focus-within {
+  border-color: #6d5df6;
+  box-shadow: 0 0 0 3px rgba(109, 93, 246, 0.15);
+}
+
+.desktop-window[data-theme="light"] .text-panel textarea {
+  color: #111827;
+}
+
+.desktop-window[data-theme="light"] .text-panel textarea::placeholder,
+.desktop-window[data-theme="light"] input::placeholder,
+.desktop-window[data-theme="light"] textarea::placeholder {
+  color: #9ca3af;
+}
+
+.desktop-window[data-theme="light"] .ghost-tool {
+  color: #4b5563;
+}
+
+.desktop-window[data-theme="light"] .ghost-tool svg {
+  color: #6b7280;
+}
+
+.desktop-window[data-theme="light"] .ghost-tool:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.desktop-window[data-theme="light"] .mode-grid {
+  border: 1px solid #e6eaf0;
+  background: #ffffff;
+}
+
+.desktop-window[data-theme="light"] .mode-tile {
+  border-right-color: #e6eaf0;
+  background: #ffffff;
+  color: #374151;
+}
+
+.desktop-window[data-theme="light"] .mode-tile svg {
+  color: #6b7280;
+}
+
+.desktop-window[data-theme="light"] .mode-tile:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.desktop-window[data-theme="light"] .mode-tile.selected {
+  background: #eef2ff;
+  color: #4338ca;
+  box-shadow: none;
+}
+
+.desktop-window[data-theme="light"] .mode-tile.selected::after {
+  border-color: #6d5df6;
+}
+
+.desktop-window[data-theme="light"] .mode-tile.selected svg,
+.desktop-window[data-theme="light"] .mode-tile.selected span {
+  color: #5b5bd6;
+}
+
+.desktop-window[data-theme="light"] .success-chip {
+  background: #ecfdf3;
+  color: #027a48;
+}
+
+.desktop-window[data-theme="light"] .output-stats span:first-child {
+  color: #027a48;
+}
+
+.desktop-window[data-theme="light"] .secondary-action,
+.desktop-window[data-theme="light"] .model-chip,
+.desktop-window[data-theme="light"] .custom-prompt-cancel {
+  border: 1px solid #d9e2ec;
+  background: #ffffff;
+  color: #374151;
+  box-shadow: none;
+}
+
+.desktop-window[data-theme="light"] .secondary-action:hover,
+.desktop-window[data-theme="light"] .custom-prompt-cancel:hover {
+  border-color: #d9e2ec;
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.desktop-window[data-theme="light"] .primary-action,
+.desktop-window[data-theme="light"] .custom-prompt-run {
+  border-color: #6d5df6;
+  background: #6d5df6;
+  color: #ffffff;
+  box-shadow: 0 6px 18px rgba(109, 93, 246, 0.18);
+}
+
+.desktop-window[data-theme="light"] .primary-action:hover,
+.desktop-window[data-theme="light"] .custom-prompt-run:hover {
+  background: #5b4cf0;
+  filter: none;
+}
+
+.desktop-window[data-theme="light"] .settings-panel {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.desktop-window[data-theme="light"] .settings-search {
+  border: 1px solid #e6eaf0;
+  background: rgba(255, 255, 255, 0.96);
+  color: #6b7280;
+  box-shadow: 0 2px 10px rgba(16, 24, 40, 0.05);
+}
+
+.desktop-window[data-theme="light"] .settings-search:focus-within {
+  border-color: #6d5df6;
+  box-shadow: 0 0 0 3px rgba(109, 93, 246, 0.15);
+}
+
+.desktop-window[data-theme="light"] .settings-search input {
+  background: transparent;
+  color: #111827;
+}
+
+.desktop-window[data-theme="light"] .settings-section {
+  border: 1px solid #e6eaf0;
+  background: #ffffff;
+  box-shadow: 0 2px 10px rgba(16, 24, 40, 0.05);
+}
+
+.desktop-window[data-theme="light"] .settings-panel h2 {
+  color: #111827;
+}
+
+.desktop-window[data-theme="light"] .settings-panel h2::before {
+  background: #6d5df6;
+  box-shadow: none;
+}
+
+.desktop-window[data-theme="light"] .settings-panel label,
+.desktop-window[data-theme="light"] .theme-options,
+.desktop-window[data-theme="light"] .theme-options-label {
+  color: #374151;
+}
+
+.desktop-window[data-theme="light"] .settings-panel input,
+.desktop-window[data-theme="light"] .settings-panel select,
+.desktop-window[data-theme="light"] .settings-textarea {
+  border-color: #d9e2ec;
+  background: #ffffff;
+  color: #111827;
+}
+
+.desktop-window[data-theme="light"] .settings-panel input:focus,
+.desktop-window[data-theme="light"] .settings-panel select:focus,
+.desktop-window[data-theme="light"] .settings-textarea:focus {
+  border-color: #6d5df6;
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(109, 93, 246, 0.15);
+}
+
+.desktop-window[data-theme="light"] .settings-panel select option {
+  background: #ffffff;
+  color: #111827;
+}
+
+.desktop-window[data-theme="light"] .test-connection-button {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.desktop-window[data-theme="light"] .shortcut-recorder {
+  border-bottom-color: #e6eaf0;
+  background: transparent;
+}
+
+.desktop-window[data-theme="light"] .shortcut-recorder span,
+.desktop-window[data-theme="light"] .toggle-copy strong {
+  color: #111827;
+}
+
+.desktop-window[data-theme="light"] .shortcut-recorder small,
+.desktop-window[data-theme="light"] .toggle-copy small {
+  color: #6b7280;
+}
+
+.desktop-window[data-theme="light"] .shortcut-recorder button {
+  border: 1px solid #d9e2ec;
+  background: #ffffff;
+  color: #374151;
+}
+
+.desktop-window[data-theme="light"] .shortcut-recorder button:hover {
+  background: #f3f4f6;
+}
+
+.desktop-window[data-theme="light"] .shortcut-recorder button svg,
+.desktop-window[data-theme="light"] .toggle-icon {
+  color: #6b7280;
+}
+
+.desktop-window[data-theme="light"] .toggle-row {
+  border-top-color: #e6eaf0;
+  background: transparent;
+}
+
+.desktop-window[data-theme="light"] .toggle-icon {
+  border-color: #e6eaf0;
+  background: #f3f5f8;
+}
+
+.desktop-window[data-theme="light"] .theme-choice {
+  color: #6b7280 !important;
+}
+
+.desktop-window[data-theme="light"] .theme-choice.selected .theme-choice-label {
+  color: #4338ca;
+}
+
+.desktop-window[data-theme="light"] .custom-prompt-overlay {
+  background: rgba(247, 248, 252, 0.76);
+}
+
+.desktop-window[data-theme="light"] .custom-prompt-panel {
+  border: 1px solid #e6eaf0;
+  background: #ffffff;
+  box-shadow: 0 6px 18px rgba(16, 24, 40, 0.1);
+}
+
+.desktop-window[data-theme="light"] .custom-prompt-panel h3,
+.desktop-window[data-theme="light"] .custom-prompt-panel label {
+  color: #111827;
+}
+
+.desktop-window[data-theme="light"] .custom-prompt-panel header span,
+.desktop-window[data-theme="light"] .custom-prompt-panel p,
+.desktop-window[data-theme="light"] .custom-prompt-panel header button {
+  color: #6b7280;
+}
+
+.desktop-window[data-theme="light"] .custom-prompt-panel textarea {
+  border-color: #d9e2ec;
+  background: #ffffff;
+  color: #111827;
+}
+
+.desktop-window[data-theme="light"] .settings-shell::-webkit-scrollbar-track {
+  background: #eef1f5;
+}
+
+.desktop-window[data-theme="light"] .settings-shell::-webkit-scrollbar-thumb {
+  background: #c5cbd5;
+  box-shadow: none;
+}
+
+.desktop-window[data-theme="light"] .settings-shell:hover::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  box-shadow: none;
+}
