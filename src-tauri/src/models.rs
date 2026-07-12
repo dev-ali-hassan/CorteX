@@ -100,6 +100,8 @@ pub struct AppSettings {
     pub theme: String,
     pub accent_color: String,
     pub launch_at_startup: bool,
+    #[serde(default = "default_minimize_to_tray")]
+    pub minimize_to_tray: bool,
     pub auto_replace: bool,
     pub auto_copy: bool,
     pub default_language: String,
@@ -129,6 +131,7 @@ impl Default for AppSettings {
             theme: "dark".to_string(),
             accent_color: "#8b5cf6".to_string(),
             launch_at_startup: false,
+            minimize_to_tray: true,
             auto_replace: true,
             auto_copy: false,
             default_language: "English".to_string(),
@@ -145,6 +148,10 @@ impl Default for AppSettings {
             provider: ProviderSettings::default(),
         }
     }
+}
+
+fn default_minimize_to_tray() -> bool {
+    true
 }
 
 fn default_friendly_shortcut() -> String {
@@ -177,6 +184,8 @@ pub struct RewriteRequest {
     pub input: String,
     pub mode: RewriteMode,
     pub target_language: Option<String>,
+    #[serde(default)]
+    pub custom_prompt: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

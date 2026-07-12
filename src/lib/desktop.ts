@@ -26,6 +26,7 @@ export type AppSettings = {
   theme: "dark" | "light" | "purple" | "system";
   accentColor: string;
   launchAtStartup: boolean;
+  minimizeToTray: boolean;
   autoReplace: boolean;
   autoCopy: boolean;
   defaultLanguage: string;
@@ -46,6 +47,7 @@ export type RewriteRequest = {
   input: string;
   mode: RewriteModeId;
   targetLanguage?: string;
+  customPrompt?: string;
 };
 
 export type RewriteResponse = {
@@ -65,6 +67,7 @@ export const defaultSettings: AppSettings = {
   theme: "dark",
   accentColor: "#8b5cf6",
   launchAtStartup: false,
+  minimizeToTray: true,
   autoReplace: true,
   autoCopy: false,
   defaultLanguage: "English",
@@ -184,6 +187,9 @@ function mockCommand<T>(command: string, args?: Record<string, unknown>): Promis
 
   if (command === "rewrite_text") {
     const request = args?.request as RewriteRequest | undefined;
+    if (request?.customPrompt?.trim()) {
+      return Promise.reject(new Error("Connect an AI provider to use Custom Prompt."));
+    }
     const output = request?.input?.trim()
       ? browserRewriteFallback(request.input, request.mode)
       : defaultOutput;

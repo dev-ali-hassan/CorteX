@@ -46,6 +46,7 @@ pub async fn show_popup(app: AppHandle, state: State<'_, AppState>) -> Result<()
                 input,
                 mode: RewriteMode::FixGrammar,
                 target_language: None,
+                custom_prompt: None,
             },
         )
         .await?;
@@ -128,6 +129,7 @@ pub async fn open_popup_from_shortcut(app: AppHandle) {
                 input,
                 mode: RewriteMode::FixGrammar,
                 target_language: None,
+                custom_prompt: None,
             },
         )
         .await
@@ -162,6 +164,7 @@ pub async fn run_direct_rewrite_shortcut(app: AppHandle, mode: RewriteMode) {
             input,
             mode,
             target_language: None,
+            custom_prompt: None,
         },
     )
     .await
@@ -194,6 +197,7 @@ pub async fn rewrite_clipboard_from_tray(app: AppHandle) {
             input,
             mode: RewriteMode::FixGrammar,
             target_language: None,
+            custom_prompt: None,
         },
     )
     .await
@@ -227,10 +231,18 @@ pub async fn rewrite_inner(
 
     let mut provider_settings = settings.provider.clone();
     provider_settings.custom_prompt = settings.custom_prompt.clone();
+    let requires_provider = request
+        .custom_prompt
+        .as_deref()
+        .map(str::trim)
+        .is_some_and(|instruction| !instruction.is_empty());
     let provider_result =
         providers::rewrite_with_provider(&state.client, &provider_settings, &request).await;
     let (output, provider, used_offline_fallback) = match provider_result {
         Ok(Some(output)) => (output, settings.provider.provider.clone(), false),
+        Ok(None) if requires_provider => {
+            return Err("Connect an AI provider to use Custom Prompt.".to_string())
+        }
         Ok(None) => (
             text::rewrite_offline(
                 &clean_input,
@@ -243,6 +255,7 @@ pub async fn rewrite_inner(
             ProviderId::Offline,
             true,
         ),
+        Err(error) if requires_provider => return Err(error),
         Err(_) if settings.provider.use_offline_fallback => (
             text::rewrite_offline(
                 &clean_input,

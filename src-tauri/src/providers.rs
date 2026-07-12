@@ -22,12 +22,15 @@ pub async fn rewrite_with_provider(
     }
 
     let default_instruction = instruction_for(&request.mode, request.target_language.as_deref());
-    let custom_instruction = settings.custom_prompt.trim();
-    let instruction = if custom_instruction.is_empty() {
+    let request_instruction = request.custom_prompt.as_deref().unwrap_or("").trim();
+    let saved_instruction = settings.custom_prompt.trim();
+    let instruction = if !request_instruction.is_empty() {
+        request_instruction.to_string()
+    } else if saved_instruction.is_empty() {
         default_instruction.to_string()
     } else {
         format!(
-            "{default_instruction}\n\nUser rewrite instructions:\n{custom_instruction}"
+            "{default_instruction}\n\nUser rewrite instructions:\n{saved_instruction}"
         )
     };
     let prompt = format!(

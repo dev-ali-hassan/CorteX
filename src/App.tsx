@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChangeEvent, KeyboardEvent } from "react";
+import type { ChangeEvent, KeyboardEvent, ReactNode } from "react";
 import clsx from "clsx";
 import {
   ChevronDown,
@@ -10,6 +10,7 @@ import {
   FileUp,
   Globe2,
   Keyboard,
+  Plug,
   RefreshCw,
   Search,
   Settings,
@@ -18,7 +19,8 @@ import {
   Wand2,
   X,
   Minus,
-  Square
+  Square,
+  Power
 } from "lucide-react";
 import {
   copyText,
@@ -35,6 +37,10 @@ import { extractTextFromDocument } from "./lib/documentImport";
 import { defaultInput, defaultOutput, rewriteModes, type RewriteModeId } from "./data/modes";
 
 type ViewKey = "rewrite" | "settings";
+
+const visibleRewriteModes = rewriteModes.filter(
+  (item) => item.id !== "shorter" && item.id !== "confident"
+);
 
 const providerLabels = {
   offline: "Offline utilities",
@@ -67,7 +73,11 @@ function App() {
 
   useEffect(() => {
     getSettings()
-      .then((value) => setSettings(value))
+      .then((value) => {
+        if (value && typeof value === "object") {
+          setSettings(value);
+        }
+      })
       .catch(() => setSettings(defaultSettings));
 
     listenToTrayNavigation((route) => {
@@ -117,7 +127,7 @@ function App() {
     };
   }, [settingsJumpTarget, view]);
 
-  async function runRewrite(nextMode = mode) {
+  async function runRewrite(nextMode = mode, customPrompt?: string) {
     const text = input.trim();
     if (!text) {
       setStatus("Add text first");
@@ -131,7 +141,8 @@ function App() {
       const response = await rewriteText({
         input: text,
         mode: nextMode,
-        targetLanguage: settings.defaultLanguage
+        targetLanguage: settings.defaultLanguage,
+        customPrompt
       });
       setOutput(response.output);
       setStatus(response.usedOfflineFallback ? "Offline rewrite ready" : "AI rewrite ready");
@@ -194,15 +205,28 @@ function App() {
   const hasConnectedProvider =
     !isOfflineModel &&
     (Boolean(settings.provider.apiKey?.trim()) || settings.provider.provider === "ollama");
-  const sidebarProviderName = isOfflineModel
-    ? "No Provider Selected"
+  const sidebarProviderName = !hasConnectedProvider
+    ? "Custom API"
     : providerLabels[settings.provider.provider] || "Custom Provider";
-  const sidebarProviderStatus = hasConnectedProvider ? "Connected" : isOfflineModel ? "Offline" : "Not Connected";
-  const activeTheme = settings.theme === "system" ? "dark" : settings.theme;
+  const sidebarProviderStatus = hasConnectedProvider ? "Connected" : "Not Connected";
+  const activeTheme = ["dark", "light", "purple"].includes(settings.theme) ? settings.theme : "dark";
 
   function openShortcutSettings() {
     setSettingsJumpTarget("shortcuts-section");
     setView("settings");
+  }
+
+  function openProviderSettings() {
+    setSettingsJumpTarget("ai-section");
+    setView("settings");
+  }
+
+  function handleThemeChange(theme: AppSettings["theme"]) {
+    const nextSettings = { ...settings, theme };
+    setSettings(nextSettings);
+    void saveSettings(nextSettings)
+      .then(() => setStatus("Theme saved"))
+      .catch(() => setStatus("Theme saved locally"));
   }
 
   return (
@@ -252,9 +276,14 @@ function App() {
           </span>
         </button>
         <div className="sidebar-separator" />
-        <div className="model-card">
+        <button
+          className="model-card"
+          type="button"
+          aria-label="Open AI provider settings"
+          onClick={openProviderSettings}
+        >
           <span className="model-icon" aria-hidden="true">
-            <Sparkles size={22} />
+            {hasConnectedProvider ? <Sparkles size={22} /> : <Plug size={22} />}
           </span>
           <span className="model-card-copy">
             <small>AI Provider</small>
@@ -264,7 +293,7 @@ function App() {
             </em>
           </span>
           <ChevronRight className="model-card-arrow" size={17} aria-hidden="true" />
-        </div>
+        </button>
         <div className="sidebar-version">
           <span>v1.0.0</span>
         </div>
@@ -292,6 +321,7 @@ function App() {
               void runRewrite(nextMode);
             }}
             onRewrite={() => runRewrite()}
+            onCustomRewrite={(instruction) => runRewrite(mode, instruction)}
             onCopy={handleCopy}
             onReplace={handleReplace}
             onDocumentImport={handleDocumentImport}
@@ -300,11 +330,18 @@ function App() {
         {view === "settings" && (
           <SettingsView
             settings={settings}
+            onThemeChange={handleThemeChange}
             onChange={async (nextSettings) => {
               setSettings(nextSettings);
-              const saved = await saveSettings(nextSettings);
-              setSettings(saved);
-              setStatus("Settings saved");
+              try {
+                const saved = await saveSettings(nextSettings);
+                if (saved && typeof saved === "object") {
+                  setSettings(saved);
+                }
+                setStatus("Settings saved");
+              } catch {
+                setStatus("Settings saved locally");
+              }
             }}
           />
         )}
@@ -395,6 +432,7 @@ function QuickRewrite({
   setInput,
   setMode,
   onRewrite,
+  onCustomRewrite,
   onCopy,
   onReplace,
   onDocumentImport
@@ -408,6 +446,7 @@ function QuickRewrite({
   setInput: (value: string) => void;
   setMode: (value: RewriteModeId) => void;
   onRewrite: () => void;
+  onCustomRewrite: (instruction: string) => Promise<void>;
   onCopy: () => void;
   onReplace: () => void;
   onDocumentImport: (file: File) => Promise<void>;
@@ -416,6 +455,8 @@ function QuickRewrite({
   const inputWords = countWords(input);
   const outputWords = countWords(output);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [customPromptOpen, setCustomPromptOpen] = useState(false);
+  const [customInstruction, setCustomInstruction] = useState("");
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -424,6 +465,15 @@ function QuickRewrite({
     }
     await onDocumentImport(file);
     event.target.value = "";
+  }
+
+  async function handleCustomRewrite() {
+    const instruction = customInstruction.trim();
+    if (!instruction) {
+      return;
+    }
+    setCustomPromptOpen(false);
+    await onCustomRewrite(instruction);
   }
 
   return (
@@ -474,7 +524,7 @@ function QuickRewrite({
       <section className="mode-section" aria-labelledby="mode-label">
         <h2 id="mode-label">Rewrite mode</h2>
         <div className="mode-grid">
-          {rewriteModes.map((item) => (
+          {visibleRewriteModes.map((item) => (
             <button
               className={clsx("mode-tile", mode === item.id && "selected")}
               type="button"
@@ -487,7 +537,61 @@ function QuickRewrite({
               <span>{item.label}</span>
             </button>
           ))}
+          <button
+            className={clsx("mode-tile custom-prompt-tile", customPromptOpen && "selected")}
+            type="button"
+            onClick={() => setCustomPromptOpen(true)}
+            aria-expanded={customPromptOpen}
+            title="Rewrite with your own AI instruction"
+          >
+            <Settings size={34} strokeWidth={2} aria-hidden="true" />
+            <span>Custom Prompt</span>
+          </button>
         </div>
+        {customPromptOpen && (
+          <div className="custom-prompt-overlay" role="presentation" onMouseDown={() => setCustomPromptOpen(false)}>
+            <section
+              className="custom-prompt-panel"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="custom-prompt-title"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <header>
+                <div>
+                  <span>AI instruction</span>
+                  <h3 id="custom-prompt-title">Custom Prompt</h3>
+                </div>
+                <button type="button" aria-label="Close custom prompt" onClick={() => setCustomPromptOpen(false)}>
+                  <X size={20} aria-hidden="true" />
+                </button>
+              </header>
+              <label htmlFor="custom-instruction">Instruction</label>
+              <textarea
+                id="custom-instruction"
+                value={customInstruction}
+                onChange={(event) => setCustomInstruction(event.target.value)}
+                placeholder="Example: Make this warm, professional, and suitable for a client email."
+                autoFocus
+              />
+              <p>Requires a connected AI provider.</p>
+              <footer>
+                <button className="custom-prompt-cancel" type="button" onClick={() => setCustomPromptOpen(false)}>
+                  Cancel
+                </button>
+                <button
+                  className="custom-prompt-run"
+                  type="button"
+                  onClick={() => void handleCustomRewrite()}
+                  disabled={!customInstruction.trim() || loading}
+                >
+                  <Sparkles size={18} aria-hidden="true" />
+                  Rewrite
+                </button>
+              </footer>
+            </section>
+          </div>
+        )}
       </section>
 
       <section className="text-panel output-panel" aria-labelledby="output-label">
@@ -549,10 +653,12 @@ function QuickRewrite({
 
 function SettingsView({
   settings,
-  onChange
+  onChange,
+  onThemeChange
 }: {
   settings: AppSettings;
   onChange: (settings: AppSettings) => void;
+  onThemeChange: (theme: AppSettings["theme"]) => void;
 }) {
   const [settingsSearch, setSettingsSearch] = useState("");
   const providerEntries = Object.entries(providerLabels) as Array<[AppSettings["provider"]["provider"], string]>;
@@ -597,7 +703,7 @@ function SettingsView({
       </label>
       <section className="settings-panel settings-stack">
         {showAI && (
-        <div className="settings-section">
+        <div className="settings-section settings-card" id="ai-section">
           <h2>AI</h2>
           <label>
             <span>Provider</span>
@@ -622,10 +728,8 @@ function SettingsView({
         </div>
         )}
 
-        {showAI && hasLaterSection(0) && <div className="settings-divider" />}
-
         {showGeneral && (
-        <div className="settings-section">
+        <div className="settings-section settings-card">
           <h2>General</h2>
           <label>
             <span>Custom prompt</span>
@@ -638,26 +742,37 @@ function SettingsView({
           </label>
           <ToggleRow
             label="Launch at startup"
+            description="Open CorteX automatically when you log in"
+            icon={<Power size={20} aria-hidden="true" />}
             checked={settings.launchAtStartup}
             onChange={(launchAtStartup) => update({ launchAtStartup })}
           />
           <ToggleRow
             label="Auto-copy result"
+            description="Copy the improved text to the clipboard automatically"
+            icon={<Copy size={20} aria-hidden="true" />}
             checked={settings.autoCopy}
             onChange={(autoCopy) => update({ autoCopy })}
           />
           <ToggleRow
             label="Auto-replace selection"
+            description="Replace selected text with the improved result"
+            icon={<Wand2 size={20} aria-hidden="true" />}
             checked={settings.autoReplace}
             onChange={(autoReplace) => update({ autoReplace })}
+          />
+          <ToggleRow
+            label="Minimize to tray"
+            description="Keep CorteX running in the system tray when you close it"
+            icon={<Minus size={20} aria-hidden="true" />}
+            checked={settings.minimizeToTray}
+            onChange={(minimizeToTray) => update({ minimizeToTray })}
           />
         </div>
         )}
 
-        {showGeneral && hasLaterSection(1) && <div className="settings-divider" />}
-
         {showShortcuts && (
-        <div className="settings-section" id="shortcuts-section">
+        <div className="settings-section settings-card" id="shortcuts-section">
           <h2>Shortcuts</h2>
           <ShortcutRecorder label="Floating Window" value={settings.globalShortcut} onChange={(globalShortcut) => update({ globalShortcut })} />
           <ShortcutRecorder label="Grammar" value={settings.grammarShortcut} onChange={(grammarShortcut) => update({ grammarShortcut })} />
@@ -675,43 +790,39 @@ function SettingsView({
         </div>
         )}
 
-        {showShortcuts && hasLaterSection(2) && <div className="settings-divider" />}
-
         {showAppearance && (
-        <div className="settings-section">
+        <div className="settings-section settings-card">
           <h2>Appearance</h2>
           <div className="theme-options" role="radiogroup" aria-label="Theme">
-            <span>Theme</span>
+            <span className="theme-options-label">Theme</span>
             {[
               ["dark", "Dark"],
               ["light", "Light"],
               ["purple", "Purple"]
             ].map(([value, label]) => (
-              <label key={value}>
-                <input
-                  type="radio"
-                  name="theme"
-                  value={value}
-                  checked={settings.theme === value}
-                  onChange={() => update({ theme: value as AppSettings["theme"] })}
-                />
-                <span>{label}</span>
-              </label>
+              <button
+                className={clsx("theme-choice", settings.theme === value && "selected")}
+                key={value}
+                type="button"
+                aria-pressed={settings.theme === value}
+                onClick={() => onThemeChange(value as AppSettings["theme"])}
+              >
+                <span className={clsx("theme-preview", `theme-preview-${value}`)} aria-hidden="true">
+                  <span className="theme-preview-bar" />
+                  <span className="theme-preview-window">
+                    <i />
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                </span>
+                <span className="theme-choice-label">{label}</span>
+              </button>
             ))}
           </div>
         </div>
         )}
 
-        {showAppearance && hasLaterSection(3) && <div className="settings-divider" />}
-
-        {showPrivacy && (
-        <div className="settings-section privacy-section">
-          <h2>Privacy</h2>
-          <p>Stored locally</p>
-          <p>No analytics</p>
-          <p>No cloud storage</p>
-        </div>
-        )}
         {!visibleSections.some(Boolean) && (
           <div className="settings-empty-state">
             <Search size={20} aria-hidden="true" />
@@ -810,16 +921,24 @@ function normalizeShortcutKey(key: string) {
 
 function ToggleRow({
   label,
+  description,
+  icon,
   checked,
   onChange
 }: {
   label: string;
+  description: string;
+  icon: ReactNode;
   checked: boolean;
   onChange: (checked: boolean) => void;
 }) {
   return (
     <label className="toggle-row">
-      <span>{label}</span>
+      <span className="toggle-icon" aria-hidden="true">{icon}</span>
+      <span className="toggle-copy">
+        <strong>{label}</strong>
+        <small>{description}</small>
+      </span>
       <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
     </label>
   );

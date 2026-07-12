@@ -22,9 +22,19 @@ pub fn run() {
         .on_window_event(|window, event| {
             if window.label() == "main" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    api.prevent_close();
-                    let _ = window.unmaximize();
-                    let _ = window.hide();
+                    let minimize_to_tray = window
+                        .app_handle()
+                        .state::<state::AppState>()
+                        .db
+                        .get_settings()
+                        .map(|settings| settings.minimize_to_tray)
+                        .unwrap_or(true);
+
+                    if minimize_to_tray {
+                        api.prevent_close();
+                        let _ = window.unmaximize();
+                        let _ = window.hide();
+                    }
                 }
             }
         })
