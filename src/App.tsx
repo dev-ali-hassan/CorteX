@@ -141,7 +141,7 @@ function App() {
     const scrollToTarget = () => {
       attempts += 1;
       const target = document.getElementById(settingsJumpTarget);
-      const scroller = document.querySelector<HTMLElement>(".settings-shell");
+      const scroller = document.querySelector<HTMLElement>(".settings-panel");
 
       if (target && scroller) {
         const top = target.offsetTop - scroller.offsetTop;
@@ -376,7 +376,7 @@ function App() {
           <ChevronRight className="model-card-arrow" size={17} aria-hidden="true" />
         </button>
         <div className="sidebar-version">
-          <span>v1.0.0</span>
+          <span>v1.0.1</span>
         </div>
       </aside>
 
@@ -622,7 +622,19 @@ function QuickRewrite({
       </section>
 
       <section className="mode-section" aria-labelledby="mode-label">
-        <h2 id="mode-label">Rewrite mode</h2>
+        <div className="mode-section-header">
+          <h2 id="mode-label">Rewrite mode</h2>
+          <button
+            className={clsx("prompt-trigger", (customPromptOpen || customPromptActive) && "active")}
+            type="button"
+            onClick={() => setCustomPromptOpen(true)}
+            aria-expanded={customPromptOpen}
+            aria-pressed={customPromptActive}
+            title="Rewrite with your own AI instruction"
+          >
+            Prompt
+          </button>
+        </div>
         <div className="mode-grid">
           {visibleRewriteModes.map((item) => (
             <button
@@ -637,17 +649,6 @@ function QuickRewrite({
               <span>{item.label}</span>
             </button>
           ))}
-          <button
-            className={clsx("mode-tile custom-prompt-tile", (customPromptOpen || customPromptActive) && "selected")}
-            type="button"
-            onClick={() => setCustomPromptOpen(true)}
-            aria-expanded={customPromptOpen}
-            aria-pressed={customPromptActive}
-            title="Rewrite with your own AI instruction"
-          >
-            <Settings size={34} strokeWidth={2} aria-hidden="true" />
-            <span>Custom Prompt</span>
-          </button>
         </div>
         {customPromptOpen && (
           <div className="custom-prompt-overlay" role="presentation" onMouseDown={() => setCustomPromptOpen(false)}>
@@ -774,7 +775,7 @@ function SettingsView({
     !normalizedSearch || keywords.some((keyword) => keyword.toLowerCase().includes(normalizedSearch));
   const visibleSections = [
     sectionMatches(["ai", "provider", "api key", "test connection", "gemini", "openai", "anthropic", "ollama"]),
-    sectionMatches(["general", "custom prompt", "startup", "auto copy", "auto replace", "behavior"]),
+    sectionMatches(["general", "startup", "auto copy", "auto replace", "behavior"]),
     sectionMatches(["shortcuts", "floating window", "grammar", "professional", "friendly", "shorter", "translate", "summarize", "confident", "simplify"]),
     sectionMatches(["appearance", "theme", "dark", "light", "system", "windows", "recommended"]),
     sectionMatches(["privacy", "stored locally", "analytics", "cloud storage"])
@@ -852,15 +853,6 @@ function SettingsView({
         {showGeneral && (
         <div className="settings-section settings-card">
           <h2>General</h2>
-          <label>
-            <span>Custom prompt</span>
-            <textarea
-              className="settings-textarea"
-              value={settings.customPrompt}
-              placeholder="Tell CorteX how to rewrite when an AI provider is connected."
-              onChange={(event) => update({ customPrompt: event.target.value })}
-            />
-          </label>
           <ToggleRow
             label="Launch at startup"
             description="Open CorteX automatically when you log in"

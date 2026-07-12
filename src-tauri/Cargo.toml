@@ -1,6 +1,6 @@
 [package]
 name = "cortex"
-version = "1.0.0"
+version = "1.0.1"
 description = "CorteX AI-powered desktop writing assistant"
 authors = ["CorteX"]
 edition = "2021"
