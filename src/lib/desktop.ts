@@ -8,8 +8,13 @@ export type ProviderId =
   | "offline"
   | "openai"
   | "openrouter"
+  | "groq"
   | "gemini"
   | "anthropic"
+  | "mistral"
+  | "cohere"
+  | "xai"
+  | "deepseek"
   | "ollama";
 
 export type ProviderSettings = {
@@ -178,6 +183,14 @@ export async function setWindowTheme(theme: "light" | "dark") {
 
 export async function testProviderConnection(settings: ProviderSettings) {
   return callCommand<string>("test_provider_connection", { settings });
+}
+
+export async function openProviderGuide(url: string) {
+  if (!isTauri()) {
+    window.open(url, "_blank", "noopener,noreferrer");
+    return;
+  }
+  return callCommand<void>("open_provider_guide", { url });
 }
 
 export function listenToPopupPayload(onPayload: (payload: PopupPayload) => void) {

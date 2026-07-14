@@ -59,6 +59,7 @@ pub fn run() {
             commands::get_settings,
             commands::save_settings,
             commands::test_provider_connection,
+            commands::open_provider_guide,
             commands::set_shortcuts_paused,
             commands::get_shortcuts_paused,
             commands::hide_main_window,

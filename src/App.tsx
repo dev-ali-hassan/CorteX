@@ -40,6 +40,8 @@ import {
 } from "./lib/desktop";
 import { extractTextFromDocument } from "./lib/documentImport";
 import { defaultInput, defaultOutput, rewriteModes, type RewriteModeId } from "./data/modes";
+import { providerLabels } from "./data/providers";
+import { ProviderWizard } from "./components/ProviderWizard";
 
 type ViewKey = "rewrite" | "settings";
 type ProviderConnectionState = "disconnected" | "checking" | "connected" | "error";
@@ -47,24 +49,6 @@ type ProviderConnectionState = "disconnected" | "checking" | "connected" | "erro
 const visibleRewriteModes = rewriteModes.filter(
   (item) => item.id !== "shorter" && item.id !== "confident"
 );
-
-const providerLabels = {
-  offline: "Offline utilities",
-  openai: "OpenAI",
-  openrouter: "OpenRouter",
-  gemini: "Google Gemini",
-  anthropic: "Anthropic Claude",
-  ollama: "Ollama local"
-};
-
-const providerModels = {
-  offline: "local-cleanup",
-  openai: "gpt-4o-mini",
-  openrouter: "openai/gpt-4o-mini",
-  gemini: "gemini-1.5-flash",
-  anthropic: "claude-3-5-haiku-latest",
-  ollama: "llama3.1"
-};
 
 function App() {
   const [view, setView] = useState<ViewKey>("rewrite");
@@ -78,6 +62,9 @@ function App() {
   const [settingsJumpTarget, setSettingsJumpTarget] = useState<string | null>(null);
   const [providerConnection, setProviderConnection] = useState<ProviderConnectionState>("disconnected");
   const [providerConnectionMessage, setProviderConnectionMessage] = useState("Select and test a provider.");
+  const [providerWizardOpen, setProviderWizardOpen] = useState(
+    () => import.meta.env.DEV && new URLSearchParams(window.location.search).has("providerSetup")
+  );
   const providerCheckId = useRef(0);
   const [systemPrefersDark, setSystemPrefersDark] = useState(() =>
     window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -271,8 +258,7 @@ function App() {
   }
 
   function openProviderSettings() {
-    setSettingsJumpTarget("ai-section");
-    setView("settings");
+    setProviderWizardOpen(true);
   }
 
   function handleThemeChange(theme: AppSettings["theme"]) {
@@ -308,6 +294,15 @@ function App() {
         setProviderConnectionMessage(error instanceof Error ? error.message : "Could not connect to the provider.");
       }
     }
+  }
+
+  async function connectProvider(providerSettings: AppSettings["provider"]) {
+    const nextSettings = { ...settings, provider: providerSettings };
+    const saved = await saveSettings(nextSettings);
+    setSettings(saved && typeof saved === "object" ? saved : nextSettings);
+    setProviderConnection("connected");
+    setProviderConnectionMessage("Connection verified successfully.");
+    setStatus(`${providerLabels[providerSettings.provider]} connected`);
   }
 
   return (
@@ -413,7 +408,7 @@ function App() {
             settings={settings}
             providerConnection={providerConnection}
             providerConnectionMessage={providerConnectionMessage}
-            onTestConnection={() => verifyProviderConnection(settings.provider)}
+            onOpenProviderWizard={() => setProviderWizardOpen(true)}
             onThemeChange={handleThemeChange}
             onChange={async (nextSettings) => {
               const previousSettings = settings;
@@ -432,6 +427,13 @@ function App() {
           />
         )}
       </section>
+      {providerWizardOpen && (
+        <ProviderWizard
+          initialSettings={settings.provider}
+          onClose={() => setProviderWizardOpen(false)}
+          onConnected={connectProvider}
+        />
+      )}
     </main>
   );
 }
@@ -759,24 +761,23 @@ function SettingsView({
   settings,
   providerConnection,
   providerConnectionMessage,
-  onTestConnection,
+  onOpenProviderWizard,
   onChange,
   onThemeChange
 }: {
   settings: AppSettings;
   providerConnection: ProviderConnectionState;
   providerConnectionMessage: string;
-  onTestConnection: () => Promise<void>;
+  onOpenProviderWizard: () => void;
   onChange: (settings: AppSettings) => void;
   onThemeChange: (theme: AppSettings["theme"]) => void;
 }) {
   const [settingsSearch, setSettingsSearch] = useState("");
-  const providerEntries = Object.entries(providerLabels) as Array<[AppSettings["provider"]["provider"], string]>;
   const normalizedSearch = settingsSearch.trim().toLowerCase();
   const sectionMatches = (keywords: string[]) =>
     !normalizedSearch || keywords.some((keyword) => keyword.toLowerCase().includes(normalizedSearch));
   const visibleSections = [
-    sectionMatches(["ai", "provider", "api key", "test connection", "gemini", "openai", "anthropic", "ollama"]),
+    sectionMatches(["ai", "provider", "api key", "test connection", "gemini", "groq", "openai", "openrouter", "anthropic", "mistral", "cohere", "xai", "grok", "deepseek", "ollama"]),
     sectionMatches(["general", "startup", "auto copy", "auto replace", "behavior"]),
     sectionMatches(["shortcuts", "floating window", "grammar", "professional", "friendly", "shorter", "translate", "summarize", "confident", "simplify"]),
     sectionMatches(["appearance", "theme", "dark", "light", "system", "windows", "recommended"]),
@@ -787,18 +788,6 @@ function SettingsView({
 
   function update(next: Partial<AppSettings>) {
     onChange({ ...settings, ...next });
-  }
-
-  function updateProvider(next: Partial<AppSettings["provider"]>) {
-    const provider = next.provider ?? settings.provider.provider;
-    onChange({
-      ...settings,
-      provider: {
-        ...settings.provider,
-        model: next.provider ? providerModels[provider] : settings.provider.model,
-        ...next
-      }
-    });
   }
 
   return (
@@ -815,40 +804,20 @@ function SettingsView({
         {showAI && (
         <div className="settings-section settings-card" id="ai-section">
           <h2>AI</h2>
-          <label>
-            <span>Provider</span>
-            <select
-              value={settings.provider.provider}
-              onChange={(event) => updateProvider({ provider: event.target.value as AppSettings["provider"]["provider"] })}
-            >
-              {providerEntries.map(([value, label]) => (
-                <option value={value} key={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>API Key</span>
-            <input
-              type="password"
-              value={settings.provider.apiKey ?? ""}
-              placeholder={settings.provider.provider === "ollama" ? "Not required for local Ollama" : "Enter API key"}
-              autoComplete="off"
-              onChange={(event) => updateProvider({ apiKey: event.target.value })}
-            />
-          </label>
-          <button
-            className="test-connection-button"
-            type="button"
-            onClick={() => void onTestConnection()}
-            disabled={providerConnection === "checking"}
-          >
-            {providerConnection === "checking" ? "Testing..." : "Test Connection"}
-          </button>
-          <p className={clsx("provider-test-status", providerConnection)} role="status">
-            {providerConnectionMessage}
-          </p>
+          <div className="settings-provider-overview">
+            <span className="settings-provider-icon" aria-hidden="true">
+              {providerConnection === "connected" ? <Sparkles size={23} /> : <Plug size={23} />}
+            </span>
+            <span>
+              <small>Current provider</small>
+              <strong>{settings.provider.provider === "offline" ? "No Provider Selected" : providerLabels[settings.provider.provider]}</strong>
+              <em className={clsx("provider-test-status", providerConnection)}>{providerConnectionMessage}</em>
+            </span>
+            <button className="test-connection-button" type="button" onClick={onOpenProviderWizard}>
+              {settings.provider.provider === "offline" ? "Connect Provider" : "Manage Provider"}
+              <ChevronRight size={17} />
+            </button>
+          </div>
         </div>
         )}
 

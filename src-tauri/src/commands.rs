@@ -4,7 +4,10 @@ use tauri::{AppHandle, Manager, State};
 
 use crate::{
     desktop,
-    models::{AppSettings, PopupPayload, ProviderId, ProviderSettings, RewriteMode, RewriteRequest, RewriteResponse},
+    models::{
+        AppSettings, PopupPayload, ProviderId, ProviderSettings, RewriteMode, RewriteRequest,
+        RewriteResponse,
+    },
     providers, shortcuts,
     state::AppState,
     text,
@@ -91,6 +94,40 @@ pub async fn test_provider_connection(
     settings: ProviderSettings,
 ) -> Result<String, String> {
     providers::test_connection(&state.client, &settings).await
+}
+
+#[tauri::command]
+pub fn open_provider_guide(url: String) -> Result<(), String> {
+    let parsed =
+        reqwest::Url::parse(&url).map_err(|_| "Invalid provider guide URL.".to_string())?;
+    if !is_allowed_provider_guide(&parsed) {
+        return Err("This provider guide is not allowed.".to_string());
+    }
+
+    std::process::Command::new("rundll32.exe")
+        .args(["url.dll,FileProtocolHandler", parsed.as_str()])
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("Could not open the provider guide: {error}"))
+}
+
+fn is_allowed_provider_guide(url: &reqwest::Url) -> bool {
+    const ALLOWED_HOSTS: [&str; 10] = [
+        "aistudio.google.com",
+        "console.groq.com",
+        "openrouter.ai",
+        "platform.openai.com",
+        "platform.claude.com",
+        "console.mistral.ai",
+        "dashboard.cohere.com",
+        "console.x.ai",
+        "platform.deepseek.com",
+        "ollama.com",
+    ];
+    url.scheme() == "https"
+        && url
+            .host_str()
+            .is_some_and(|host| ALLOWED_HOSTS.contains(&host))
 }
 
 #[tauri::command]
@@ -345,5 +382,21 @@ fn error_popup_payload(error: String) -> PopupPayload {
         provider: ProviderId::Offline,
         used_offline_fallback: true,
         source: "shortcut".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod provider_guide_tests {
+    use super::is_allowed_provider_guide;
+
+    #[test]
+    fn allows_only_known_https_provider_guides() {
+        let allowed = reqwest::Url::parse("https://console.groq.com/keys").unwrap();
+        let wrong_scheme = reqwest::Url::parse("http://console.groq.com/keys").unwrap();
+        let wrong_host = reqwest::Url::parse("https://example.com/keys").unwrap();
+
+        assert!(is_allowed_provider_guide(&allowed));
+        assert!(!is_allowed_provider_guide(&wrong_scheme));
+        assert!(!is_allowed_provider_guide(&wrong_host));
     }
 }

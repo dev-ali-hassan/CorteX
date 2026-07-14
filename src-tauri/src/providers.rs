@@ -29,9 +29,7 @@ pub async fn rewrite_with_provider(
     } else if saved_instruction.is_empty() {
         default_instruction.to_string()
     } else {
-        format!(
-            "{default_instruction}\n\nUser rewrite instructions:\n{saved_instruction}"
-        )
+        format!("{default_instruction}\n\nUser rewrite instructions:\n{saved_instruction}")
     };
     let prompt = format!(
         "{instruction}\n\nRules:\n- Return only the rewritten text.\n- Preserve the user's meaning.\n- Do not add explanations.\n\nText:\n{}",
@@ -63,6 +61,55 @@ pub async fn rewrite_with_provider(
             )
             .await?
         }
+        ProviderId::Groq => {
+            call_openai_compatible(
+                client,
+                settings,
+                settings
+                    .endpoint
+                    .as_deref()
+                    .unwrap_or("https://api.groq.com/openai/v1/chat/completions"),
+                &prompt,
+            )
+            .await?
+        }
+        ProviderId::Mistral => {
+            call_openai_compatible(
+                client,
+                settings,
+                settings
+                    .endpoint
+                    .as_deref()
+                    .unwrap_or("https://api.mistral.ai/v1/chat/completions"),
+                &prompt,
+            )
+            .await?
+        }
+        ProviderId::Xai => {
+            call_openai_compatible(
+                client,
+                settings,
+                settings
+                    .endpoint
+                    .as_deref()
+                    .unwrap_or("https://api.x.ai/v1/chat/completions"),
+                &prompt,
+            )
+            .await?
+        }
+        ProviderId::Deepseek => {
+            call_openai_compatible(
+                client,
+                settings,
+                settings
+                    .endpoint
+                    .as_deref()
+                    .unwrap_or("https://api.deepseek.com/chat/completions"),
+                &prompt,
+            )
+            .await?
+        }
+        ProviderId::Cohere => call_cohere(client, settings, &prompt).await?,
         ProviderId::Anthropic => call_anthropic(client, settings, &prompt).await?,
         ProviderId::Gemini => call_gemini(client, settings, &prompt).await?,
         ProviderId::Ollama => call_ollama(client, settings, &prompt).await?,
@@ -72,7 +119,10 @@ pub async fn rewrite_with_provider(
     Ok(Some(output))
 }
 
-pub async fn test_connection(client: &Client, settings: &ProviderSettings) -> Result<String, String> {
+pub async fn test_connection(
+    client: &Client,
+    settings: &ProviderSettings,
+) -> Result<String, String> {
     if settings.provider == ProviderId::Offline {
         return Err("Select an AI provider first.".to_string());
     }
@@ -84,17 +134,42 @@ pub async fn test_connection(client: &Client, settings: &ProviderSettings) -> Re
     }
 
     match settings.provider {
-        ProviderId::Openai | ProviderId::Openrouter => {
-            let default_endpoint = if settings.provider == ProviderId::Openai {
-                "https://api.openai.com/v1/models"
-            } else {
-                "https://openrouter.ai/api/v1/models"
+        ProviderId::Openai
+        | ProviderId::Openrouter
+        | ProviderId::Groq
+        | ProviderId::Mistral
+        | ProviderId::Xai
+        | ProviderId::Deepseek => {
+            let default_endpoint = match settings.provider {
+                ProviderId::Openai => "https://api.openai.com/v1/models",
+                ProviderId::Openrouter => "https://openrouter.ai/api/v1/models",
+                ProviderId::Groq => "https://api.groq.com/openai/v1/models",
+                ProviderId::Mistral => "https://api.mistral.ai/v1/models",
+                ProviderId::Xai => "https://api.x.ai/v1/models",
+                ProviderId::Deepseek => "https://api.deepseek.com/models",
+                _ => unreachable!(),
             };
             let endpoint = settings
                 .endpoint
                 .as_deref()
                 .map(models_endpoint_from_openai_compatible)
                 .unwrap_or_else(|| default_endpoint.to_string());
+            ensure_success(
+                client
+                    .get(endpoint)
+                    .bearer_auth(settings.api_key.as_deref().unwrap_or_default())
+                    .send()
+                    .await
+                    .map_err(connection_error)?,
+            )
+            .await?;
+        }
+        ProviderId::Cohere => {
+            let endpoint = settings
+                .endpoint
+                .as_deref()
+                .map(|endpoint| models_endpoint_from_cohere(endpoint, &settings.model))
+                .unwrap_or_else(|| format!("https://api.cohere.com/v1/models/{}", settings.model));
             ensure_success(
                 client
                     .get(endpoint)
@@ -127,7 +202,14 @@ pub async fn test_connection(client: &Client, settings: &ProviderSettings) -> Re
                 "https://generativelanguage.googleapis.com/v1beta/models?key={}",
                 settings.api_key.as_deref().unwrap_or_default()
             );
-            ensure_success(client.get(endpoint).send().await.map_err(connection_error)?).await?;
+            ensure_success(
+                client
+                    .get(endpoint)
+                    .send()
+                    .await
+                    .map_err(connection_error)?,
+            )
+            .await?;
         }
         ProviderId::Ollama => {
             let endpoint = settings
@@ -135,21 +217,35 @@ pub async fn test_connection(client: &Client, settings: &ProviderSettings) -> Re
                 .as_deref()
                 .map(ollama_tags_endpoint)
                 .unwrap_or_else(|| "http://localhost:11434/api/tags".to_string());
-            let value = response_json(client.get(endpoint).send().await.map_err(connection_error)?).await?;
+            let value = response_json(
+                client
+                    .get(endpoint)
+                    .send()
+                    .await
+                    .map_err(connection_error)?,
+            )
+            .await?;
             let configured_model = settings.model.trim();
             if !configured_model.is_empty() {
-                let installed = value
-                    .get("models")
-                    .and_then(Value::as_array)
-                    .is_some_and(|models| {
-                        models.iter().any(|model| {
-                            let name = model.get("name").and_then(Value::as_str).unwrap_or_default();
-                            let model_id = model.get("model").and_then(Value::as_str).unwrap_or_default();
-                            name == configured_model
-                                || model_id == configured_model
-                                || name.split(':').next() == configured_model.split(':').next()
-                        })
-                    });
+                let installed =
+                    value
+                        .get("models")
+                        .and_then(Value::as_array)
+                        .is_some_and(|models| {
+                            models.iter().any(|model| {
+                                let name = model
+                                    .get("name")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or_default();
+                                let model_id = model
+                                    .get("model")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or_default();
+                                name == configured_model
+                                    || model_id == configured_model
+                                    || name.split(':').next() == configured_model.split(':').next()
+                            })
+                        });
                 if !installed {
                     return Err(format!(
                         "Ollama is running, but model '{configured_model}' is not installed."
@@ -191,7 +287,10 @@ async fn call_openai_compatible(
         .await
         .map_err(|error| error.to_string())?;
 
-    parse_json_response(response_json(response).await?, &["choices.0.message.content"])
+    parse_json_response(
+        response_json(response).await?,
+        &["choices.0.message.content"],
+    )
 }
 
 async fn call_anthropic(
@@ -263,7 +362,10 @@ async fn call_gemini(
         .await
         .map_err(|error| error.to_string())?;
 
-    parse_json_response(response_json(response).await?, &["candidates.0.content.parts.0.text"])
+    parse_json_response(
+        response_json(response).await?,
+        &["candidates.0.content.parts.0.text"],
+    )
 }
 
 async fn call_ollama(
@@ -292,6 +394,40 @@ async fn call_ollama(
     parse_json_response(response_json(response).await?, &["response"])
 }
 
+async fn call_cohere(
+    client: &Client,
+    settings: &ProviderSettings,
+    prompt: &str,
+) -> Result<String, String> {
+    let endpoint = settings
+        .endpoint
+        .as_deref()
+        .unwrap_or("https://api.cohere.com/v2/chat");
+    let response = client
+        .post(endpoint)
+        .bearer_auth(settings.api_key.as_deref().unwrap_or_default())
+        .json(&json!({
+            "model": settings.model.as_str(),
+            "temperature": settings.temperature,
+            "max_tokens": settings.max_tokens,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are CorteX, a precise desktop writing assistant."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        }))
+        .send()
+        .await
+        .map_err(|error| error.to_string())?;
+
+    parse_json_response(response_json(response).await?, &["message.content.0.text"])
+}
+
 async fn response_json(response: Response) -> Result<Value, String> {
     let status = response.status();
     let value = response
@@ -318,7 +454,8 @@ fn connection_error(error: reqwest::Error) -> String {
     if error.is_timeout() {
         "Connection timed out. Check the provider address and try again.".to_string()
     } else if error.is_connect() {
-        "Could not reach the provider. Check that it is running and the address is correct.".to_string()
+        "Could not reach the provider. Check that it is running and the address is correct."
+            .to_string()
     } else {
         format!("Connection failed: {error}")
     }
@@ -339,6 +476,15 @@ fn models_endpoint_from_anthropic(endpoint: &str) -> String {
         format!("{prefix}/models")
     } else {
         format!("{endpoint}/models")
+    }
+}
+
+fn models_endpoint_from_cohere(endpoint: &str, model: &str) -> String {
+    let endpoint = endpoint.trim_end_matches('/');
+    if let Some(prefix) = endpoint.strip_suffix("/v2/chat") {
+        format!("{prefix}/v1/models/{model}")
+    } else {
+        format!("{endpoint}/v1/models/{model}")
     }
 }
 
@@ -384,7 +530,10 @@ fn read_path<'a>(value: &'a Value, path: &str) -> Option<&'a str> {
 
 #[cfg(test)]
 mod tests {
-    use super::{models_endpoint_from_anthropic, models_endpoint_from_openai_compatible, ollama_tags_endpoint};
+    use super::{
+        models_endpoint_from_anthropic, models_endpoint_from_cohere,
+        models_endpoint_from_openai_compatible, ollama_tags_endpoint,
+    };
 
     #[test]
     fn derives_openai_compatible_models_endpoint() {
@@ -399,6 +548,14 @@ mod tests {
         assert_eq!(
             models_endpoint_from_anthropic("https://api.anthropic.com/v1/messages"),
             "https://api.anthropic.com/v1/models"
+        );
+    }
+
+    #[test]
+    fn derives_cohere_models_endpoint() {
+        assert_eq!(
+            models_endpoint_from_cohere("https://api.cohere.com/v2/chat", "command-a-plus-05-2026"),
+            "https://api.cohere.com/v1/models/command-a-plus-05-2026"
         );
     }
 

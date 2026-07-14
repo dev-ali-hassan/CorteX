@@ -47,8 +47,13 @@ pub enum ProviderId {
     Offline,
     Openai,
     Openrouter,
+    Groq,
     Gemini,
     Anthropic,
+    Mistral,
+    Cohere,
+    Xai,
+    Deepseek,
     Ollama,
 }
 
@@ -58,8 +63,13 @@ impl ProviderId {
             Self::Offline => "offline",
             Self::Openai => "openai",
             Self::Openrouter => "openrouter",
+            Self::Groq => "groq",
             Self::Gemini => "gemini",
             Self::Anthropic => "anthropic",
+            Self::Mistral => "mistral",
+            Self::Cohere => "cohere",
+            Self::Xai => "xai",
+            Self::Deepseek => "deepseek",
             Self::Ollama => "ollama",
         }
     }
