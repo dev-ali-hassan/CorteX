@@ -131,7 +131,19 @@ export async function getPopupPayload() {
 }
 
 export async function hideCurrentWindow() {
-  await getCurrentWindow().hide().catch(() => undefined);
+  if (!isTauri()) {
+    return;
+  }
+
+  await callCommand<void>("hide_popup_window").catch(() => getCurrentWindow().hide());
+}
+
+export async function startCurrentWindowDrag() {
+  if (!isTauri()) {
+    return;
+  }
+
+  await getCurrentWindow().startDragging();
 }
 
 export async function windowAction(action: "minimize" | "maximize" | "close") {

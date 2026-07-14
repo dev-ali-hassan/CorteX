@@ -416,6 +416,7 @@ function App() {
             onTestConnection={() => verifyProviderConnection(settings.provider)}
             onThemeChange={handleThemeChange}
             onChange={async (nextSettings) => {
+              const previousSettings = settings;
               setSettings(nextSettings);
               try {
                 const saved = await saveSettings(nextSettings);
@@ -423,8 +424,9 @@ function App() {
                   setSettings(saved);
                 }
                 setStatus("Settings saved");
-              } catch {
-                setStatus("Settings saved locally");
+              } catch (error) {
+                setSettings(previousSettings);
+                setStatus(error instanceof Error ? error.message : "Could not apply this setting");
               }
             }}
           />
@@ -632,7 +634,7 @@ function QuickRewrite({
             aria-pressed={customPromptActive}
             title="Rewrite with your own AI instruction"
           >
-            Prompt
+            Custom Prompt
           </button>
         </div>
         <div className="mode-grid">

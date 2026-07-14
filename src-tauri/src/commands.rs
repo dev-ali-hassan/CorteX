@@ -15,7 +15,9 @@ pub async fn rewrite_text(
     state: State<'_, AppState>,
     request: RewriteRequest,
 ) -> Result<RewriteResponse, String> {
-    rewrite_inner(state.inner(), request).await
+    let response = rewrite_inner(state.inner(), request).await?;
+    apply_auto_copy(state.inner(), &response)?;
+    Ok(response)
 }
 
 #[tauri::command]
@@ -77,6 +79,7 @@ pub fn save_settings(
     state: State<'_, AppState>,
     settings: AppSettings,
 ) -> Result<AppSettings, String> {
+    desktop::sync_launch_at_startup(settings.launch_at_startup)?;
     let saved = state.db.save_settings(&settings)?;
     shortcuts::sync_registered_shortcuts(&app)?;
     Ok(saved)
@@ -104,6 +107,11 @@ pub fn get_shortcuts_paused(state: State<'_, AppState>) -> Result<bool, String> 
 #[tauri::command]
 pub fn hide_main_window(app: AppHandle) -> Result<(), String> {
     desktop::hide_main_window(&app)
+}
+
+#[tauri::command]
+pub fn hide_popup_window(app: AppHandle) -> Result<(), String> {
+    desktop::hide_popup_window(&app)
 }
 
 #[tauri::command]
@@ -184,12 +192,18 @@ pub async fn run_direct_rewrite_shortcut(app: AppHandle, mode: RewriteMode) {
     let settings = state.db.get_settings().unwrap_or_default();
     if settings.auto_replace {
         let _ = desktop::replace_selected_text(&response.output, capture.previous_clipboard);
-    } else {
+        if settings.auto_copy {
+            let _ = desktop::write_clipboard_text(&response.output);
+        }
+    } else if settings.auto_copy {
         let _ = desktop::write_clipboard_text(&response.output);
     }
 
     let payload = PopupPayload::from((response, "shortcut"));
     let _ = store_popup_payload(state.inner(), &payload);
+    if !settings.auto_replace && !settings.auto_copy {
+        let _ = desktop::show_popup_window(&app, &payload);
+    }
 }
 
 pub async fn rewrite_clipboard_from_tray(app: AppHandle) {
@@ -289,6 +303,13 @@ pub async fn rewrite_inner(
     };
 
     Ok(response)
+}
+
+fn apply_auto_copy(state: &AppState, response: &RewriteResponse) -> Result<(), String> {
+    if state.db.get_settings().unwrap_or_default().auto_copy {
+        desktop::write_clipboard_text(&response.output)?;
+    }
+    Ok(())
 }
 
 fn store_popup_payload(state: &AppState, payload: &PopupPayload) -> Result<(), String> {

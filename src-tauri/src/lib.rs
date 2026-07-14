@@ -14,9 +14,20 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             let state = state::AppState::new(app.handle())?;
+            let launch_at_startup = state
+                .db
+                .get_settings()
+                .map(|settings| settings.launch_at_startup)
+                .unwrap_or(false);
             app.manage(state);
             tray::create(app.handle())?;
             shortcuts::register(app)?;
+            let _ = desktop::sync_launch_at_startup(launch_at_startup);
+            if std::env::args().any(|argument| argument == "--background") {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -51,6 +62,7 @@ pub fn run() {
             commands::set_shortcuts_paused,
             commands::get_shortcuts_paused,
             commands::hide_main_window,
+            commands::hide_popup_window,
             commands::show_main_window
         ])
         .run(tauri::generate_context!())

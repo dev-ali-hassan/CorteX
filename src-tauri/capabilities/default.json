@@ -3,5 +3,5 @@
   "identifier": "main-capability",
   "description": "CorteX desktop windows can invoke app commands and receive shortcut events.",
   "windows": ["main", "popup"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "core:window:allow-start-dragging"]
 }

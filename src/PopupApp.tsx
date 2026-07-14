@@ -17,6 +17,7 @@ import {
   listenToPopupPayload,
   replaceSelectedText,
   rewriteText,
+  startCurrentWindowDrag,
   type PopupPayload
 } from "./lib/desktop";
 import { defaultInput, defaultOutput, modeLabel, rewriteModes, type RewriteModeId } from "./data/modes";
@@ -53,7 +54,10 @@ function PopupApp() {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
         void hideCurrentWindow();
+        return;
       }
       if (event.key === "Enter" && event.ctrlKey) {
         event.preventDefault();
@@ -93,18 +97,25 @@ function PopupApp() {
     await hideCurrentWindow();
   }
 
+  function handleTitlebarMouseDown(event: React.MouseEvent<HTMLElement>) {
+    if (event.button !== 0 || (event.target as HTMLElement).closest("button, kbd")) {
+      return;
+    }
+    void startCurrentWindowDrag();
+  }
+
   return (
     <main className="popup-root" aria-label="CorteX floating rewrite popup">
       <section className="popup-card">
-        <header className="popup-titlebar" data-tauri-drag-region>
-          <div className="popup-brand">
+        <header className="popup-titlebar" data-tauri-drag-region onMouseDown={handleTitlebarMouseDown}>
+          <div className="popup-brand" data-tauri-drag-region>
             <Sparkles size={21} aria-hidden="true" />
             <strong>CorteX</strong>
             <span>{payload.provider === "offline" ? "Offline" : payload.provider}</span>
           </div>
           <div className="popup-window-actions">
             <kbd>ESC</kbd>
-            <button type="button" aria-label="Close popup" onClick={() => hideCurrentWindow()}>
+            <button type="button" aria-label="Close popup" onClick={() => void hideCurrentWindow()}>
               <X size={20} aria-hidden="true" />
             </button>
           </div>
@@ -128,7 +139,6 @@ function PopupApp() {
         <section className="popup-output" aria-labelledby="popup-output-label">
           <div className="popup-output-heading">
             <h1 id="popup-output-label">Output Text</h1>
-            <span>{payload.output.length} chars</span>
           </div>
           <div className="popup-output-box" role="textbox" aria-readonly="true" tabIndex={0}>
             {payload.output || `Ready to ${modeLabel(mode).toLowerCase()}. Select text and use Ctrl + Alt + Z.`}
