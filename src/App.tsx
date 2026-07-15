@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Search,
   Settings,
+  SlidersHorizontal,
   Sparkles,
   Trash2,
   Wand2,
@@ -50,6 +51,24 @@ const visibleRewriteModes = rewriteModes.filter(
   (item) => item.id !== "shorter" && item.id !== "confident"
 );
 
+const PROVIDER_ONBOARDING_KEY = "cortex.provider-onboarding.v1";
+
+function providerOnboardingWasSeen() {
+  try {
+    return window.localStorage.getItem(PROVIDER_ONBOARDING_KEY) === "complete";
+  } catch {
+    return false;
+  }
+}
+
+function rememberProviderOnboarding() {
+  try {
+    window.localStorage.setItem(PROVIDER_ONBOARDING_KEY, "complete");
+  } catch {
+    // Provider settings are still preserved by the desktop database.
+  }
+}
+
 function App() {
   const [view, setView] = useState<ViewKey>("rewrite");
   const [input, setInput] = useState(defaultInput);
@@ -65,6 +84,7 @@ function App() {
   const [providerWizardOpen, setProviderWizardOpen] = useState(
     () => import.meta.env.DEV && new URLSearchParams(window.location.search).has("providerSetup")
   );
+  const [providerWizardOnboarding, setProviderWizardOnboarding] = useState(false);
   const providerCheckId = useRef(0);
   const [systemPrefersDark, setSystemPrefersDark] = useState(() =>
     window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -106,10 +126,21 @@ function App() {
       .then((value) => {
         if (value && typeof value === "object") {
           const theme = ["system", "dark", "light"].includes(value.theme) ? value.theme : "system";
-          setSettings({ ...value, theme });
+          const loadedSettings = { ...value, theme };
+          setSettings(loadedSettings);
+          if (!providerOnboardingWasSeen() && loadedSettings.provider.provider === "offline") {
+            setProviderWizardOnboarding(true);
+            setProviderWizardOpen(true);
+          }
         }
       })
-      .catch(() => setSettings(defaultSettings));
+      .catch(() => {
+        setSettings(defaultSettings);
+        if (!providerOnboardingWasSeen()) {
+          setProviderWizardOnboarding(true);
+          setProviderWizardOpen(true);
+        }
+      });
 
     listenToTrayNavigation((route) => {
       if (route === "settings" || route === "rewrite") {
@@ -258,7 +289,16 @@ function App() {
   }
 
   function openProviderSettings() {
+    setProviderWizardOnboarding(false);
     setProviderWizardOpen(true);
+  }
+
+  function closeProviderWizard() {
+    if (providerWizardOnboarding) {
+      rememberProviderOnboarding();
+    }
+    setProviderWizardOnboarding(false);
+    setProviderWizardOpen(false);
   }
 
   function handleThemeChange(theme: AppSettings["theme"]) {
@@ -303,6 +343,7 @@ function App() {
     setProviderConnection("connected");
     setProviderConnectionMessage("Connection verified successfully.");
     setStatus(`${providerLabels[providerSettings.provider]} connected`);
+    rememberProviderOnboarding();
   }
 
   return (
@@ -408,7 +449,7 @@ function App() {
             settings={settings}
             providerConnection={providerConnection}
             providerConnectionMessage={providerConnectionMessage}
-            onOpenProviderWizard={() => setProviderWizardOpen(true)}
+            onOpenProviderWizard={openProviderSettings}
             onThemeChange={handleThemeChange}
             onChange={async (nextSettings) => {
               const previousSettings = settings;
@@ -430,7 +471,8 @@ function App() {
       {providerWizardOpen && (
         <ProviderWizard
           initialSettings={settings.provider}
-          onClose={() => setProviderWizardOpen(false)}
+          showScreenSkip={providerWizardOnboarding}
+          onClose={closeProviderWizard}
           onConnected={connectProvider}
         />
       )}
@@ -651,7 +693,10 @@ function QuickRewrite({
             aria-pressed={customPromptActive}
             title="Rewrite with your own AI instruction"
           >
-            Custom Prompt
+            <span className="mode-prompt-icon" aria-hidden="true">
+              <SlidersHorizontal size={21} strokeWidth={2.1} />
+            </span>
+            <span>Custom Prompt</span>
           </button>
         </div>
         {customPromptOpen && (

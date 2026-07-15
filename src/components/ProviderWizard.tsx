@@ -35,6 +35,7 @@ type WizardStep = 1 | 2 | 3 | 4 | 5;
 
 type ProviderWizardProps = {
   initialSettings: ProviderSettings;
+  showScreenSkip?: boolean;
   onClose: () => void;
   onConnected: (settings: ProviderSettings) => Promise<void>;
 };
@@ -65,7 +66,7 @@ function candidateSettings(initial: ProviderSettings, definition: ProviderDefini
   };
 }
 
-export function ProviderWizard({ initialSettings, onClose, onConnected }: ProviderWizardProps) {
+export function ProviderWizard({ initialSettings, showScreenSkip = false, onClose, onConnected }: ProviderWizardProps) {
   const initialProvider = initialSettings.provider === "offline" ? "gemini" : initialSettings.provider;
   const [step, setStep] = useState<WizardStep>(1);
   const [selectedId, setSelectedId] = useState<ConnectableProviderId>(initialProvider);
@@ -116,6 +117,11 @@ export function ProviderWizard({ initialSettings, onClose, onConnected }: Provid
 
   return (
     <div className="provider-wizard-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      {showScreenSkip && (
+        <button className="provider-onboarding-skip" type="button" onClick={onClose}>
+          Skip
+        </button>
+      )}
       <section className="provider-wizard" role="dialog" aria-modal="true" aria-labelledby="provider-wizard-title">
         <header className="provider-wizard-header">
           <div className="provider-wizard-heading">
@@ -268,7 +274,7 @@ export function ProviderWizard({ initialSettings, onClose, onConnected }: Provid
         </div>
 
         <footer className="provider-wizard-footer">
-          {step === 1 && <button className="secondary" type="button" onClick={onClose}>Skip for now</button>}
+          {step === 1 && !showScreenSkip && <button className="secondary" type="button" onClick={onClose}>Cancel</button>}
           {step > 1 && step < 4 && <button className="secondary" type="button" onClick={() => setStep((step - 1) as WizardStep)}><ArrowLeft size={16} /> Back</button>}
           {step === 4 && testError && <button className="secondary" type="button" onClick={() => setStep(3)}><ArrowLeft size={16} /> Back</button>}
           <span />
