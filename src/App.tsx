@@ -628,16 +628,6 @@ function QuickRewrite({
       <section className="mode-section" aria-labelledby="mode-label">
         <div className="mode-section-header">
           <h2 id="mode-label">Rewrite mode</h2>
-          <button
-            className={clsx("prompt-trigger", (customPromptOpen || customPromptActive) && "active")}
-            type="button"
-            onClick={() => setCustomPromptOpen(true)}
-            aria-expanded={customPromptOpen}
-            aria-pressed={customPromptActive}
-            title="Rewrite with your own AI instruction"
-          >
-            Custom Prompt
-          </button>
         </div>
         <div className="mode-grid">
           {visibleRewriteModes.map((item) => (
@@ -653,6 +643,16 @@ function QuickRewrite({
               <span>{item.label}</span>
             </button>
           ))}
+          <button
+            className={clsx("prompt-trigger mode-prompt-trigger", (customPromptOpen || customPromptActive) && "active")}
+            type="button"
+            onClick={() => setCustomPromptOpen(true)}
+            aria-expanded={customPromptOpen}
+            aria-pressed={customPromptActive}
+            title="Rewrite with your own AI instruction"
+          >
+            Custom Prompt
+          </button>
         </div>
         {customPromptOpen && (
           <div className="custom-prompt-overlay" role="presentation" onMouseDown={() => setCustomPromptOpen(false)}>

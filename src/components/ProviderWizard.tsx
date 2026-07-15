@@ -159,6 +159,10 @@ export function ProviderWizard({ initialSettings, onClose, onConnected }: Provid
                         className={clsx("provider-picker-row", item.id === selectedId && "selected")}
                         key={item.id}
                         onClick={() => selectProvider(item.id)}
+                        onDoubleClick={() => {
+                          selectProvider(item.id);
+                          setStep(2);
+                        }}
                       >
                         <span className={`provider-logo provider-${item.id}`}><ProviderMark provider={item.id} /></span>
                         <span className="provider-picker-copy">
