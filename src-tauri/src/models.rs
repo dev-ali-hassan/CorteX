@@ -221,6 +221,8 @@ pub struct PopupPayload {
     pub character_count: usize,
     pub elapsed_ms: u64,
     pub source: String,
+    #[serde(default)]
+    pub loading: bool,
 }
 
 impl From<(RewriteResponse, &str)> for PopupPayload {
@@ -234,6 +236,7 @@ impl From<(RewriteResponse, &str)> for PopupPayload {
             character_count: response.character_count,
             elapsed_ms: response.elapsed_ms,
             source: source.to_string(),
+            loading: false,
         }
     }
 }

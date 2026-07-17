@@ -20,6 +20,7 @@ pub fn run() {
                 .map(|settings| settings.launch_at_startup)
                 .unwrap_or(false);
             app.manage(state);
+            let _ = desktop::prepare_popup_window(app.handle());
             tray::create(app.handle())?;
             shortcuts::register(app)?;
             let _ = desktop::sync_launch_at_startup(launch_at_startup);

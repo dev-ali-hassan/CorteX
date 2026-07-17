@@ -12,8 +12,8 @@ use tauri::{
 
 use crate::models::PopupPayload;
 
-const POPUP_WIDTH: f64 = 620.0;
-const POPUP_HEIGHT: f64 = 360.0;
+const POPUP_WIDTH: f64 = 650.0;
+const POPUP_HEIGHT: f64 = 310.0;
 const POPUP_GAP: i32 = 14;
 
 #[derive(Debug, Clone)]
@@ -89,9 +89,9 @@ pub fn replace_selected_text(text: &str, previous_clipboard: Option<String>) -> 
     Ok(())
 }
 
-pub fn show_popup_window(app: &AppHandle, payload: &PopupPayload) -> Result<(), String> {
-    let popup = match app.get_webview_window("popup") {
-        Some(window) => window,
+fn get_or_create_popup_window(app: &AppHandle) -> Result<WebviewWindow, String> {
+    match app.get_webview_window("popup") {
+        Some(window) => Ok(window),
         None => WebviewWindowBuilder::new(
             app,
             "popup",
@@ -100,14 +100,26 @@ pub fn show_popup_window(app: &AppHandle, payload: &PopupPayload) -> Result<(), 
         .title("CorteX Rewrite")
         .inner_size(POPUP_WIDTH, POPUP_HEIGHT)
         .decorations(false)
-        .transparent(false)
+        .transparent(true)
         .always_on_top(true)
         .skip_taskbar(true)
         .resizable(false)
         .visible(false)
         .build()
-        .map_err(|error| error.to_string())?,
-    };
+        .map_err(|error| error.to_string()),
+    }
+}
+
+pub fn prepare_popup_window(app: &AppHandle) -> Result<(), String> {
+    get_or_create_popup_window(app).map(|_| ())
+}
+
+fn present_popup_window(
+    app: &AppHandle,
+    payload: &PopupPayload,
+    take_focus: bool,
+) -> Result<(), String> {
+    let popup = get_or_create_popup_window(app)?;
 
     popup
         .set_size(LogicalSize::new(POPUP_WIDTH, POPUP_HEIGHT))
@@ -138,11 +150,21 @@ pub fn show_popup_window(app: &AppHandle, payload: &PopupPayload) -> Result<(), 
     let _ = popup.unminimize();
     let _ = popup.set_always_on_top(true);
     popup.show().map_err(|error| error.to_string())?;
-    popup.set_focus().map_err(|error| error.to_string())?;
+    if take_focus {
+        popup.set_focus().map_err(|error| error.to_string())?;
+    }
     popup
         .emit("popup-context", payload.clone())
         .map_err(|error| error.to_string())?;
     Ok(())
+}
+
+pub fn show_popup_window(app: &AppHandle, payload: &PopupPayload) -> Result<(), String> {
+    present_popup_window(app, payload, true)
+}
+
+pub fn show_popup_window_passive(app: &AppHandle, payload: &PopupPayload) -> Result<(), String> {
+    present_popup_window(app, payload, false)
 }
 
 #[cfg(windows)]

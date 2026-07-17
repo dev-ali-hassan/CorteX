@@ -715,7 +715,7 @@ function QuickRewrite({
             title="Rewrite with your own AI instruction"
           >
             <span className="mode-prompt-icon" aria-hidden="true">
-              <SlidersHorizontal size={21} strokeWidth={2.1} />
+              <SlidersHorizontal size={17} strokeWidth={2.1} />
             </span>
             <span>Custom Prompt</span>
           </button>

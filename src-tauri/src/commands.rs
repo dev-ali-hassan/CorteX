@@ -206,6 +206,10 @@ pub async fn open_popup_from_shortcut(app: AppHandle) {
     let payload = if input.is_empty() {
         empty_popup_payload()
     } else {
+        let loading_payload = loading_popup_payload(input.clone());
+        let _ = store_popup_payload(state.inner(), &loading_payload);
+        let _ = desktop::show_popup_window_passive(&app, &loading_payload);
+
         match rewrite_inner(
             state.inner(),
             RewriteRequest {
@@ -422,6 +426,21 @@ fn empty_popup_payload() -> PopupPayload {
         character_count,
         elapsed_ms: 0,
         source: "shortcut".to_string(),
+        loading: false,
+    }
+}
+
+fn loading_popup_payload(input: String) -> PopupPayload {
+    PopupPayload {
+        input,
+        output: String::new(),
+        mode: RewriteMode::FixGrammar,
+        provider: ProviderId::Offline,
+        used_offline_fallback: false,
+        character_count: 0,
+        elapsed_ms: 0,
+        source: "shortcut".to_string(),
+        loading: true,
     }
 }
 
@@ -435,6 +454,7 @@ fn error_popup_payload(error: String) -> PopupPayload {
         used_offline_fallback: true,
         elapsed_ms: 0,
         source: "shortcut".to_string(),
+        loading: false,
     }
 }
 

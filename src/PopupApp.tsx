@@ -30,12 +30,16 @@ const initialPayload: PopupPayload = {
   usedOfflineFallback: true,
   characterCount: defaultOutput.length,
   elapsedMs: 0,
-  source: "manual"
+  source: "manual",
+  loading: false
 };
 
 function formatElapsed(milliseconds: number) {
+  if (!Number.isFinite(milliseconds) || milliseconds <= 0) {
+    return "0ms";
+  }
   if (milliseconds < 1000) {
-    return `${milliseconds}ms`;
+    return `${Math.round(milliseconds)}ms`;
   }
   return `${(milliseconds / 1000).toFixed(2)}s`;
 }
@@ -44,18 +48,22 @@ function PopupApp() {
   const [payload, setPayload] = useState(initialPayload);
   const [mode, setMode] = useState<RewriteModeId>("fixGrammar");
   const [busy, setBusy] = useState(false);
+  const visibleCharacterCount = Array.from(payload.output || "").length;
+  const characterLimit = Math.max(1000, visibleCharacterCount);
 
   useEffect(() => {
     getPopupPayload().then((value) => {
       if (value) {
         setPayload(value);
         setMode(value.mode);
+        setBusy(Boolean(value.loading));
       }
     });
 
     listenToPopupPayload((value) => {
       setPayload(value);
       setMode(value.mode);
+      setBusy(Boolean(value.loading));
     }).then((unlisten) => () => unlisten());
   }, []);
 
@@ -154,14 +162,16 @@ function PopupApp() {
             <div className="popup-output-copy" aria-live="polite">
               {busy ? "Rewriting..." : payload.output || `Ready to ${modeLabel(mode).toLowerCase()}. Select text and use Ctrl + Alt + Z.`}
             </div>
-            <span className="popup-character-count">{payload.characterCount} characters</span>
+            <span className="popup-character-count">
+              {visibleCharacterCount.toLocaleString()} / {characterLimit.toLocaleString()}
+            </span>
           </div>
         </section>
 
         <footer className="popup-footer">
           <div className="popup-status" aria-live="polite">
-            <span className="popup-ready"><CheckCircle2 size={18} aria-hidden="true" />Ready</span>
-            <span className="popup-elapsed"><Clock3 size={17} aria-hidden="true" />{formatElapsed(payload.elapsedMs)}</span>
+            <span className="popup-ready"><CheckCircle2 size={18} aria-hidden="true" />{busy ? "Rewriting" : "Ready"}</span>
+            <span className="popup-elapsed"><Clock3 size={17} aria-hidden="true" />{busy ? "..." : formatElapsed(payload.elapsedMs)}</span>
           </div>
           <div className="popup-actions">
             <button type="button" onClick={handleReplace} className="ghost-action">

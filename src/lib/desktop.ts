@@ -67,6 +67,7 @@ export type RewriteResponse = {
 
 export type PopupPayload = RewriteResponse & {
   source: "shortcut" | "tray" | "manual";
+  loading?: boolean;
 };
 
 export const defaultSettings: AppSettings = {
