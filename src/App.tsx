@@ -11,13 +11,13 @@ import {
   Globe2,
   Keyboard,
   Plug,
-  RefreshCw,
   Search,
   Settings,
   SlidersHorizontal,
   Sparkles,
   Trash2,
   Wand2,
+  Zap,
   X,
   Minus,
   Square,
@@ -77,6 +77,7 @@ function App() {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [status, setStatus] = useState("Ready");
   const [loading, setLoading] = useState(false);
+  const [rewriteElapsedMs, setRewriteElapsedMs] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [settingsJumpTarget, setSettingsJumpTarget] = useState<string | null>(null);
   const [providerConnection, setProviderConnection] = useState<ProviderConnectionState>("disconnected");
@@ -198,6 +199,7 @@ function App() {
 
     setLoading(true);
     setCopied(false);
+    setRewriteElapsedMs(null);
     setStatus("Rewriting");
     try {
       const response = await rewriteText({
@@ -207,6 +209,7 @@ function App() {
         customPrompt
       });
       setOutput(response.output);
+      setRewriteElapsedMs(response.elapsedMs);
       setStatus(response.usedOfflineFallback ? "Offline rewrite ready" : "AI rewrite ready");
       if (settings.autoCopy) {
         await copyText(response.output);
@@ -249,6 +252,7 @@ function App() {
       }
       setInput(text);
       setOutput("");
+      setRewriteElapsedMs(null);
       setStatus(`Imported ${file.name}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not import file");
@@ -430,6 +434,7 @@ function App() {
             output={output}
             mode={mode}
             loading={loading}
+            elapsedMs={rewriteElapsedMs}
             status={status}
             copied={copied}
             setInput={setInput}
@@ -552,11 +557,26 @@ function countWords(value: string) {
   return words ? words.length : 0;
 }
 
+function formatWordCount(count: number) {
+  return `${count} ${count === 1 ? "word" : "words"}`;
+}
+
+function formatElapsed(milliseconds: number | null) {
+  if (milliseconds === null) {
+    return "--";
+  }
+  if (milliseconds < 1000) {
+    return `${milliseconds}ms`;
+  }
+  return `${(milliseconds / 1000).toFixed(2)}s`;
+}
+
 function QuickRewrite({
   input,
   output,
   mode,
   loading,
+  elapsedMs,
   status,
   copied,
   setInput,
@@ -571,6 +591,7 @@ function QuickRewrite({
   output: string;
   mode: RewriteModeId;
   loading: boolean;
+  elapsedMs: number | null;
   status: string;
   copied: boolean;
   setInput: (value: string) => void;
@@ -648,7 +669,7 @@ function QuickRewrite({
             <Globe2 size={18} aria-hidden="true" />
             English
           </span>
-          <span className="word-count">{inputWords} words</span>
+          <span className="word-count">{formatWordCount(inputWords)}</span>
           <input
             ref={fileInputRef}
             className="file-input"
@@ -779,25 +800,26 @@ function QuickRewrite({
               <CheckCircle2 size={18} aria-hidden="true" />
               {status}
             </span>
-            <span>1.2s</span>
+            <span>{formatElapsed(elapsedMs)}</span>
           </div>
-          <span className="word-count output-word-count">{outputWords} words</span>
+          <span className="word-count output-word-count">{formatWordCount(outputWords)}</span>
           <div className="output-actions">
             <button className={clsx("primary-action", copied && "copied")} type="button" onClick={onCopy}>
               {copied ? <CheckCircle2 size={20} aria-hidden="true" /> : <Copy size={23} aria-hidden="true" />}
               <span>{copied ? "Copied" : "Copy"}</span>
             </button>
+            <button
+              className="primary-action rewrite-output-action"
+              type="button"
+              onClick={handleRewriteAgain}
+              disabled={loading}
+            >
+              <Zap size={18} aria-hidden="true" />
+              <span>{loading ? "Rewriting" : "Rewrite"}</span>
+            </button>
           </div>
         </div>
       </section>
-
-      <footer className="action-row">
-        <button className="secondary-action" type="button" onClick={handleRewriteAgain} disabled={loading}>
-          <RefreshCw size={21} aria-hidden="true" />
-          <span>{loading ? "Rewriting" : "Rewrite Again"}</span>
-          <kbd>Enter</kbd>
-        </button>
-      </footer>
     </div>
   );
 }
@@ -814,7 +836,7 @@ function SettingsView({
   providerConnection: ProviderConnectionState;
   providerConnectionMessage: string;
   onOpenProviderWizard: () => void;
-  onChange: (settings: AppSettings) => void;
+  onChange: (settings: AppSettings) => void | Promise<void>;
   onThemeChange: (theme: AppSettings["theme"]) => void;
 }) {
   const [settingsSearch, setSettingsSearch] = useState("");
@@ -832,7 +854,7 @@ function SettingsView({
   const hasLaterSection = (index: number) => visibleSections.slice(index + 1).some(Boolean);
 
   function update(next: Partial<AppSettings>) {
-    onChange({ ...settings, ...next });
+    return onChange({ ...settings, ...next });
   }
 
   return (
@@ -984,6 +1006,7 @@ function ShortcutRecorder({
   onChange: (value: string) => void;
 }) {
   const [recording, setRecording] = useState(false);
+  const [error, setError] = useState("");
 
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     if (!recording) {
@@ -995,6 +1018,11 @@ function ShortcutRecorder({
 
     const shortcut = formatShortcut(event);
     if (shortcut) {
+      if (isUnsafeRecordedShortcut(shortcut)) {
+        setError("Add Alt, Shift, or Win, or use Ctrl with a number.");
+        return;
+      }
+      setError("");
       onChange(shortcut);
       setRecording(false);
     }
@@ -1005,11 +1033,15 @@ function ShortcutRecorder({
       <div>
         <span>{label}</span>
         <small>Current: {value}</small>
+        {error && <em className="shortcut-error">{error}</em>}
       </div>
       <button
         type="button"
         className={clsx(recording && "recording")}
-        onClick={() => setRecording(true)}
+        onClick={() => {
+          setError("");
+          setRecording(true);
+        }}
         onKeyDown={handleKeyDown}
         onBlur={() => setRecording(false)}
       >
@@ -1057,6 +1089,17 @@ function normalizeShortcutKey(key: string) {
     return key.replace("Arrow", "");
   }
   return key.length ? key[0].toUpperCase() + key.slice(1) : "";
+}
+
+function isUnsafeRecordedShortcut(shortcut: string) {
+  const parts = shortcut.split("+").map((part) => part.trim().toLowerCase());
+  const hasCtrl = parts.includes("ctrl");
+  const hasAlt = parts.includes("alt");
+  const hasShift = parts.includes("shift");
+  const hasWin = parts.includes("win");
+  const key = parts.find((part) => !["ctrl", "alt", "shift", "win"].includes(part));
+
+  return Boolean(hasCtrl && !hasAlt && !hasShift && !hasWin && key?.length === 1 && /[a-z]/.test(key));
 }
 
 function ToggleRow({

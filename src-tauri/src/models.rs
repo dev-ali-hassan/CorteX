@@ -207,6 +207,7 @@ pub struct RewriteResponse {
     pub provider: ProviderId,
     pub used_offline_fallback: bool,
     pub character_count: usize,
+    pub elapsed_ms: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -218,6 +219,7 @@ pub struct PopupPayload {
     pub provider: ProviderId,
     pub used_offline_fallback: bool,
     pub character_count: usize,
+    pub elapsed_ms: u64,
     pub source: String,
 }
 
@@ -230,6 +232,7 @@ impl From<(RewriteResponse, &str)> for PopupPayload {
             provider: response.provider,
             used_offline_fallback: response.used_offline_fallback,
             character_count: response.character_count,
+            elapsed_ms: response.elapsed_ms,
             source: source.to_string(),
         }
     }

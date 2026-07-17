@@ -63,6 +63,7 @@ pub fn run() {
             commands::set_shortcuts_paused,
             commands::get_shortcuts_paused,
             commands::hide_main_window,
+            commands::close_main_window,
             commands::hide_popup_window,
             commands::show_main_window
         ])

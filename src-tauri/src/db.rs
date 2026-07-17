@@ -81,5 +81,4 @@ impl Database {
         .map_err(|error| error.to_string())?;
         Ok(settings.clone())
     }
-
 }

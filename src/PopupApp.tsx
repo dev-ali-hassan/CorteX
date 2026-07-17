@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import clsx from "clsx";
 import {
   Check,
-  ClipboardCopy,
+  CheckCircle2,
+  Clock3,
   Copy,
-  CornerDownLeft,
+  Minus,
   Replace,
-  Sparkles,
   X,
   Zap
 } from "lucide-react";
@@ -29,8 +29,16 @@ const initialPayload: PopupPayload = {
   provider: "offline",
   usedOfflineFallback: true,
   characterCount: defaultOutput.length,
+  elapsedMs: 0,
   source: "manual"
 };
+
+function formatElapsed(milliseconds: number) {
+  if (milliseconds < 1000) {
+    return `${milliseconds}ms`;
+  }
+  return `${(milliseconds / 1000).toFixed(2)}s`;
+}
 
 function PopupApp() {
   const [payload, setPayload] = useState(initialPayload);
@@ -109,11 +117,13 @@ function PopupApp() {
       <section className="popup-card">
         <header className="popup-titlebar" data-tauri-drag-region onMouseDown={handleTitlebarMouseDown}>
           <div className="popup-brand" data-tauri-drag-region>
-            <Sparkles size={21} aria-hidden="true" />
+            <img src="/cortex-icon.png" alt="" aria-hidden="true" />
             <strong>CorteX</strong>
-            <span>{payload.provider === "offline" ? "Offline" : payload.provider}</span>
           </div>
           <div className="popup-window-actions">
+            <button type="button" aria-label="Hide popup" onClick={() => void hideCurrentWindow()}>
+              <Minus size={19} aria-hidden="true" />
+            </button>
             <kbd>ESC</kbd>
             <button type="button" aria-label="Close popup" onClick={() => void hideCurrentWindow()}>
               <X size={20} aria-hidden="true" />
@@ -138,38 +148,29 @@ function PopupApp() {
 
         <section className="popup-output" aria-labelledby="popup-output-label">
           <div className="popup-output-heading">
-            <h1 id="popup-output-label">Output Text</h1>
+            <h1 id="popup-output-label">Rewritten Text</h1>
           </div>
-          <div className="popup-output-box" role="textbox" aria-readonly="true" tabIndex={0}>
-            {payload.output || `Ready to ${modeLabel(mode).toLowerCase()}. Select text and use Ctrl + Alt + Z.`}
+          <div className={clsx("popup-output-box", busy && "rewriting")} role="textbox" aria-readonly="true" tabIndex={0}>
+            <div className="popup-output-copy" aria-live="polite">
+              {busy ? "Rewriting..." : payload.output || `Ready to ${modeLabel(mode).toLowerCase()}. Select text and use Ctrl + Alt + Z.`}
+            </div>
+            <span className="popup-character-count">{payload.characterCount} characters</span>
           </div>
         </section>
 
         <footer className="popup-footer">
-          <div className="popup-shortcuts" aria-hidden="true">
-            <span>
-              <kbd>
-                <CornerDownLeft size={16} />
-              </kbd>
-              Run
-            </span>
-            <span>
-              <kbd>Ctrl + Enter</kbd>
-              Replace
-            </span>
-            <span>
-              <kbd>Ctrl + C</kbd>
-              Copy
-            </span>
+          <div className="popup-status" aria-live="polite">
+            <span className="popup-ready"><CheckCircle2 size={18} aria-hidden="true" />Ready</span>
+            <span className="popup-elapsed"><Clock3 size={17} aria-hidden="true" />{formatElapsed(payload.elapsedMs)}</span>
           </div>
           <div className="popup-actions">
-            <button type="button" onClick={handleCopy} className="ghost-action">
-              <ClipboardCopy size={20} aria-hidden="true" />
-              Copy
-            </button>
             <button type="button" onClick={handleReplace} className="ghost-action">
               <Replace size={20} aria-hidden="true" />
               Replace
+            </button>
+            <button type="button" onClick={handleCopy} className="ghost-action">
+              <Copy size={20} aria-hidden="true" />
+              Copy
             </button>
             <button type="button" onClick={() => runRewrite(mode)} className="popup-primary" disabled={busy}>
               <Zap size={21} aria-hidden="true" />

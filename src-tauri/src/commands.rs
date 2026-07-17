@@ -1,4 +1,4 @@
-use std::sync::atomic::Ordering;
+use std::{sync::atomic::Ordering, time::Instant};
 
 use tauri::{AppHandle, Manager, State};
 
@@ -55,6 +55,12 @@ pub async fn show_popup(app: AppHandle, state: State<'_, AppState>) -> Result<()
             },
         )
         .await?;
+        let settings = state.db.get_settings().unwrap_or_default();
+        apply_automatic_shortcut_output(
+            &settings,
+            &response.output,
+            capture.previous_clipboard.clone(),
+        )?;
         PopupPayload::from((response, "manual"))
     };
 
@@ -73,7 +79,13 @@ pub fn get_popup_payload(state: State<'_, AppState>) -> Result<Option<PopupPaylo
 
 #[tauri::command]
 pub fn get_settings(state: State<'_, AppState>) -> Result<AppSettings, String> {
-    state.db.get_settings()
+    let mut settings = state.db.get_settings()?;
+    let startup_enabled = desktop::launch_at_startup_enabled()?;
+    if settings.launch_at_startup != startup_enabled {
+        settings.launch_at_startup = startup_enabled;
+        return state.db.save_settings(&settings);
+    }
+    Ok(settings)
 }
 
 #[tauri::command]
@@ -82,9 +94,16 @@ pub fn save_settings(
     state: State<'_, AppState>,
     settings: AppSettings,
 ) -> Result<AppSettings, String> {
+    shortcuts::validate_shortcuts(&settings)?;
+    let previous = state.db.get_settings()?;
     desktop::sync_launch_at_startup(settings.launch_at_startup)?;
     let saved = state.db.save_settings(&settings)?;
-    shortcuts::sync_registered_shortcuts(&app)?;
+    if let Err(error) = shortcuts::sync_registered_shortcuts(&app) {
+        let _ = state.db.save_settings(&previous);
+        let _ = desktop::sync_launch_at_startup(previous.launch_at_startup);
+        let _ = shortcuts::sync_registered_shortcuts(&app);
+        return Err(format!("Could not activate that shortcut: {error}"));
+    }
     Ok(saved)
 }
 
@@ -147,6 +166,17 @@ pub fn hide_main_window(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn close_main_window(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    let minimize_to_tray = state.db.get_settings()?.minimize_to_tray;
+    if minimize_to_tray {
+        desktop::hide_main_window(&app)
+    } else {
+        app.exit(0);
+        Ok(())
+    }
+}
+
+#[tauri::command]
 pub fn hide_popup_window(app: AppHandle) -> Result<(), String> {
     desktop::hide_popup_window(&app)
 }
@@ -187,7 +217,15 @@ pub async fn open_popup_from_shortcut(app: AppHandle) {
         )
         .await
         {
-            Ok(response) => PopupPayload::from((response, "shortcut")),
+            Ok(response) => {
+                let settings = state.db.get_settings().unwrap_or_default();
+                let _ = apply_automatic_shortcut_output(
+                    &settings,
+                    &response.output,
+                    capture.previous_clipboard.clone(),
+                );
+                PopupPayload::from((response, "shortcut"))
+            }
             Err(error) => error_popup_payload(error),
         }
     };
@@ -227,20 +265,30 @@ pub async fn run_direct_rewrite_shortcut(app: AppHandle, mode: RewriteMode) {
     };
 
     let settings = state.db.get_settings().unwrap_or_default();
-    if settings.auto_replace {
-        let _ = desktop::replace_selected_text(&response.output, capture.previous_clipboard);
-        if settings.auto_copy {
-            let _ = desktop::write_clipboard_text(&response.output);
-        }
-    } else if settings.auto_copy {
-        let _ = desktop::write_clipboard_text(&response.output);
-    }
+    let _ =
+        apply_automatic_shortcut_output(&settings, &response.output, capture.previous_clipboard);
 
     let payload = PopupPayload::from((response, "shortcut"));
     let _ = store_popup_payload(state.inner(), &payload);
     if !settings.auto_replace && !settings.auto_copy {
         let _ = desktop::show_popup_window(&app, &payload);
     }
+}
+
+fn apply_automatic_shortcut_output(
+    settings: &AppSettings,
+    output: &str,
+    previous_clipboard: Option<String>,
+) -> Result<(), String> {
+    if settings.auto_replace {
+        desktop::replace_selected_text(output, previous_clipboard)?;
+        if settings.auto_copy {
+            desktop::write_clipboard_text(output)?;
+        }
+    } else if settings.auto_copy {
+        desktop::write_clipboard_text(output)?;
+    }
+    Ok(())
 }
 
 pub async fn rewrite_clipboard_from_tray(app: AppHandle) {
@@ -275,6 +323,7 @@ pub async fn rewrite_inner(
     state: &AppState,
     request: RewriteRequest,
 ) -> Result<RewriteResponse, String> {
+    let started = Instant::now();
     let settings = state.db.get_settings().unwrap_or_default();
     let clean_input = request.input.trim().to_string();
     if clean_input.is_empty() {
@@ -285,6 +334,7 @@ pub async fn rewrite_inner(
             provider: ProviderId::Offline,
             used_offline_fallback: true,
             character_count: 0,
+            elapsed_ms: started.elapsed().as_millis() as u64,
         });
     }
 
@@ -337,6 +387,7 @@ pub async fn rewrite_inner(
         mode: request.mode,
         provider,
         used_offline_fallback,
+        elapsed_ms: started.elapsed().as_millis() as u64,
     };
 
     Ok(response)
@@ -369,6 +420,7 @@ fn empty_popup_payload() -> PopupPayload {
         provider: ProviderId::Offline,
         used_offline_fallback: true,
         character_count,
+        elapsed_ms: 0,
         source: "shortcut".to_string(),
     }
 }
@@ -381,6 +433,7 @@ fn error_popup_payload(error: String) -> PopupPayload {
         mode: RewriteMode::FixGrammar,
         provider: ProviderId::Offline,
         used_offline_fallback: true,
+        elapsed_ms: 0,
         source: "shortcut".to_string(),
     }
 }

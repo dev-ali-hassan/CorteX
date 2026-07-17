@@ -62,6 +62,7 @@ export type RewriteResponse = {
   provider: ProviderId;
   usedOfflineFallback: boolean;
   characterCount: number;
+  elapsedMs: number;
 };
 
 export type PopupPayload = RewriteResponse & {
@@ -169,7 +170,7 @@ export async function windowAction(action: "minimize" | "maximize" | "close") {
     }
   }
   if (action === "close") {
-    await callCommand<void>("hide_main_window").catch(() => current.hide());
+    await callCommand<void>("close_main_window").catch(() => current.close());
   }
 }
 
@@ -237,7 +238,8 @@ function mockCommand<T>(command: string, args?: Record<string, unknown>): Promis
       mode: request?.mode ?? "fixGrammar",
       provider: "offline",
       usedOfflineFallback: true,
-      characterCount: output.length
+      characterCount: output.length,
+      elapsedMs: 0
     } as T);
   }
 

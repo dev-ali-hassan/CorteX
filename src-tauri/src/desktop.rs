@@ -6,8 +6,8 @@ use std::{
 
 use arboard::Clipboard;
 use tauri::{
-    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalSize, WebviewUrl,
-    Theme, WebviewWindow, WebviewWindowBuilder,
+    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalSize, Theme, WebviewUrl,
+    WebviewWindow, WebviewWindowBuilder,
 };
 
 use crate::models::PopupPayload;
@@ -117,8 +117,8 @@ pub fn show_popup_window(app: &AppHandle, payload: &PopupPayload) -> Result<(), 
         let scale = popup.scale_factor().unwrap_or(1.0);
         let popup_width = (POPUP_WIDTH * scale).round() as i32;
         let popup_height = (POPUP_HEIGHT * scale).round() as i32;
-        let (left, top, right, bottom) = monitor_bounds_at_cursor(app, cursor_x, cursor_y)
-            .unwrap_or((0, 0, 1920, 1080));
+        let (left, top, right, bottom) =
+            monitor_bounds_at_cursor(app, cursor_x, cursor_y).unwrap_or((0, 0, 1920, 1080));
         let margin = (12.0 * scale).round() as i32;
         let gap = (POPUP_GAP as f64 * scale).round() as i32;
 
@@ -173,7 +173,11 @@ pub fn sync_launch_at_startup(enabled: bool) -> Result<(), String> {
         if !output.status.success() {
             return Err(registry_error("enable launch at startup", &output.stderr));
         }
-        return Ok(());
+        return if launch_at_startup_enabled()? {
+            Ok(())
+        } else {
+            Err("Windows did not keep the CorteX startup entry.".to_string())
+        };
     }
 
     command.args(["DELETE", RUN_KEY, "/v", VALUE_NAME, "/f"]);
@@ -191,9 +195,37 @@ pub fn sync_launch_at_startup(enabled: bool) -> Result<(), String> {
     }
 }
 
+#[cfg(windows)]
+pub fn launch_at_startup_enabled() -> Result<bool, String> {
+    use std::{os::windows::process::CommandExt, process::Command};
+
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
+    const VALUE_NAME: &str = "CorteX";
+
+    let output = Command::new("reg.exe")
+        .creation_flags(CREATE_NO_WINDOW)
+        .args(["QUERY", RUN_KEY, "/v", VALUE_NAME])
+        .output()
+        .map_err(|error| error.to_string())?;
+
+    if !output.status.success() {
+        return Ok(false);
+    }
+
+    let executable = std::env::current_exe().map_err(|error| error.to_string())?;
+    let value = String::from_utf8_lossy(&output.stdout).to_ascii_lowercase();
+    Ok(value.contains(&executable.display().to_string().to_ascii_lowercase()))
+}
+
 #[cfg(not(windows))]
 pub fn sync_launch_at_startup(_enabled: bool) -> Result<(), String> {
     Ok(())
+}
+
+#[cfg(not(windows))]
+pub fn launch_at_startup_enabled() -> Result<bool, String> {
+    Ok(false)
 }
 
 fn startup_command_line(executable: &Path) -> String {
@@ -226,7 +258,10 @@ fn popup_position(
     } else {
         cursor_x - popup_width - gap
     }
-    .clamp(left + margin, (right - popup_width - margin).max(left + margin));
+    .clamp(
+        left + margin,
+        (right - popup_width - margin).max(left + margin),
+    );
 
     let preferred_below = cursor_y + gap;
     let y = if preferred_below + popup_height <= bottom - margin {
@@ -234,7 +269,10 @@ fn popup_position(
     } else {
         cursor_y - popup_height - gap
     }
-    .clamp(top + margin, (bottom - popup_height - margin).max(top + margin));
+    .clamp(
+        top + margin,
+        (bottom - popup_height - margin).max(top + margin),
+    );
 
     (x, y)
 }

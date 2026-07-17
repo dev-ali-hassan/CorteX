@@ -1,1 +1,1 @@
-{"main-capability":{"identifier":"main-capability","description":"CorteX desktop windows can invoke app commands and receive shortcut events.","local":true,"windows":["main","popup"],"permissions":["core:default","core:window:allow-start-dragging"]}}
+{"main-capability":{"identifier":"main-capability","description":"CorteX desktop windows can invoke app commands and receive shortcut events.","local":true,"windows":["main","popup"],"permissions":["core:default"]}}
