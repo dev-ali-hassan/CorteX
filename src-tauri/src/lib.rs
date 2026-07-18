@@ -34,6 +34,14 @@ pub fn run() {
             let _ = desktop::sync_launch_at_startup(launch_at_startup);
             if !std::env::args().any(|argument| argument == "--background") {
                 let _ = desktop::show_main_window(app.handle());
+                let app_handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(200));
+                    let restore_handle = app_handle.clone();
+                    let _ = app_handle.run_on_main_thread(move || {
+                        let _ = desktop::show_main_window(&restore_handle);
+                    });
+                });
             }
             Ok(())
         })
