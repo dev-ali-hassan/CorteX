@@ -12,6 +12,14 @@ use tauri::Manager;
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            if !args.iter().any(|argument| argument == "--background") {
+                let app_handle = app.clone();
+                let _ = app.run_on_main_thread(move || {
+                    let _ = desktop::show_main_window(&app_handle);
+                });
+            }
+        }))
         .setup(|app| {
             let state = state::AppState::new(app.handle())?;
             let launch_at_startup = state
@@ -24,10 +32,8 @@ pub fn run() {
             tray::create(app.handle())?;
             shortcuts::register(app)?;
             let _ = desktop::sync_launch_at_startup(launch_at_startup);
-            if std::env::args().any(|argument| argument == "--background") {
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.hide();
-                }
+            if !std::env::args().any(|argument| argument == "--background") {
+                let _ = desktop::show_main_window(app.handle());
             }
             Ok(())
         })

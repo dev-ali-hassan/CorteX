@@ -24,7 +24,7 @@
         "transparent": false,
         "resizable": true,
         "theme": "Dark",
-        "visible": true
+        "visible": false
       }
     ],
     "security": {

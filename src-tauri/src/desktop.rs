@@ -101,6 +101,7 @@ fn get_or_create_popup_window(app: &AppHandle) -> Result<WebviewWindow, String> 
         .inner_size(POPUP_WIDTH, POPUP_HEIGHT)
         .decorations(false)
         .transparent(true)
+        .shadow(false)
         .always_on_top(true)
         .skip_taskbar(true)
         .resizable(false)
@@ -350,9 +351,27 @@ fn restore_main_window(window: &WebviewWindow, app: &AppHandle) -> Result<(), St
 
     window.show().map_err(|error| error.to_string())?;
     let _ = window.unminimize();
+    force_windows_restore(window);
     let _ = window.set_focus();
     Ok(())
 }
+
+#[cfg(windows)]
+fn force_windows_restore(window: &WebviewWindow) {
+    use windows::Win32::{
+        Foundation::HWND,
+        UI::WindowsAndMessaging::{SetForegroundWindow, ShowWindowAsync, SW_RESTORE},
+    };
+
+    if let Ok(handle) = window.hwnd() {
+        let hwnd = HWND(handle.0 as *mut core::ffi::c_void);
+        let _ = unsafe { ShowWindowAsync(hwnd, SW_RESTORE) };
+        let _ = unsafe { SetForegroundWindow(hwnd) };
+    }
+}
+
+#[cfg(not(windows))]
+fn force_windows_restore(_window: &WebviewWindow) {}
 
 fn is_window_off_screen(window: &WebviewWindow, app: &AppHandle) -> bool {
     let position = match window.outer_position() {

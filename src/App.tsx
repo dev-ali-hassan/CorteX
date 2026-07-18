@@ -123,6 +123,31 @@ function App() {
   ]);
 
   useEffect(() => {
+    if (settings.provider.provider !== "ollama") {
+      return;
+    }
+
+    const refreshOllamaStatus = () => {
+      if (document.visibilityState === "visible") {
+        void verifyProviderConnection(settings.provider, true);
+      }
+    };
+    const timer = window.setInterval(refreshOllamaStatus, 5000);
+    window.addEventListener("focus", refreshOllamaStatus);
+    document.addEventListener("visibilitychange", refreshOllamaStatus);
+
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshOllamaStatus);
+      document.removeEventListener("visibilitychange", refreshOllamaStatus);
+    };
+  }, [
+    settings.provider.provider,
+    settings.provider.model,
+    settings.provider.endpoint
+  ]);
+
+  useEffect(() => {
     getSettings()
       .then((value) => {
         if (value && typeof value === "object") {
@@ -313,7 +338,7 @@ function App() {
       .catch(() => setStatus("Theme saved locally"));
   }
 
-  async function verifyProviderConnection(providerSettings = settings.provider) {
+  async function verifyProviderConnection(providerSettings = settings.provider, silent = false) {
     const checkId = ++providerCheckId.current;
     if (
       providerSettings.provider === "offline" ||
@@ -324,8 +349,10 @@ function App() {
       return;
     }
 
-    setProviderConnection("checking");
-    setProviderConnectionMessage("Checking the provider connection...");
+    if (!silent) {
+      setProviderConnection("checking");
+      setProviderConnectionMessage("Checking the provider connection...");
+    }
     try {
       await testProviderConnection(providerSettings);
       if (providerCheckId.current === checkId) {

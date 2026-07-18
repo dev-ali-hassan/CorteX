@@ -216,13 +216,20 @@ pub async fn test_connection(
                 .endpoint
                 .as_deref()
                 .map(ollama_tags_endpoint)
-                .unwrap_or_else(|| "http://localhost:11434/api/tags".to_string());
+                .unwrap_or_else(|| "http://127.0.0.1:11434/api/tags".to_string());
             let value = response_json(
                 client
                     .get(endpoint)
                     .send()
                     .await
-                    .map_err(connection_error)?,
+                    .map_err(|error| {
+                        if error.is_connect() {
+                            "Ollama is not responding. Start Ollama and CorteX will reconnect automatically."
+                                .to_string()
+                        } else {
+                            connection_error(error)
+                        }
+                    })?,
             )
             .await?;
             let configured_model = settings.model.trim();
@@ -376,7 +383,7 @@ async fn call_ollama(
     let endpoint = settings
         .endpoint
         .as_deref()
-        .unwrap_or("http://localhost:11434/api/generate");
+        .unwrap_or("http://127.0.0.1:11434/api/generate");
     let response = client
         .post(endpoint)
         .json(&json!({

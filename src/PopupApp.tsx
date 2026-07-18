@@ -113,18 +113,20 @@ function PopupApp() {
     await hideCurrentWindow();
   }
 
-  function handleTitlebarMouseDown(event: React.MouseEvent<HTMLElement>) {
+  function handleTitlebarPointerDown(event: React.PointerEvent<HTMLElement>) {
     if (event.button !== 0 || (event.target as HTMLElement).closest("button, kbd")) {
       return;
     }
+
+    event.preventDefault();
     void startCurrentWindowDrag();
   }
 
   return (
     <main className="popup-root" aria-label="CorteX floating rewrite popup">
       <section className="popup-card">
-        <header className="popup-titlebar" data-tauri-drag-region onMouseDown={handleTitlebarMouseDown}>
-          <div className="popup-brand" data-tauri-drag-region>
+        <header className="popup-titlebar" onPointerDownCapture={handleTitlebarPointerDown}>
+          <div className="popup-brand">
             <img src="/cortex-icon.png" alt="" aria-hidden="true" />
             <strong>CorteX</strong>
           </div>

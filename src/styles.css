@@ -2475,6 +2475,19 @@ kbd {
   background: #f3f1ff;
 }
 
+.desktop-window[data-theme="light"] .provider-picker-group h3 {
+  color: #5b3fc4;
+}
+
+.desktop-window[data-theme="light"] .provider-picker-row em {
+  background: #e8e3ff;
+  color: #5135b8;
+}
+
+.desktop-window[data-theme="light"] .provider-picker-row.selected .provider-picker-arrow {
+  color: #5b3fc4;
+}
+
 .desktop-window[data-theme="light"] .provider-logo,
 .desktop-window[data-theme="light"] .provider-wizard-footer .secondary {
   border-color: #e1e5ec;
@@ -3183,7 +3196,7 @@ kbd {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  padding: 6px;
+  padding: 0;
   background: transparent;
 }
 
@@ -3209,6 +3222,13 @@ kbd {
 .popup-titlebar {
   padding: 0 18px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.popup-titlebar:active {
+  cursor: grabbing;
 }
 
 .popup-brand {
