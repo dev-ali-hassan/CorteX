@@ -44,6 +44,8 @@ pub async fn show_popup(app: AppHandle, state: State<'_, AppState>) -> Result<()
     let input = capture.text.trim().to_string();
     let payload = if input.is_empty() {
         empty_popup_payload()
+    } else if is_non_prose_selection(&input) {
+        invalid_selection_popup_payload()
     } else {
         let response = rewrite_inner(
             state.inner(),
@@ -205,6 +207,8 @@ pub async fn open_popup_from_shortcut(app: AppHandle) {
     let input = capture.text.trim().to_string();
     let payload = if input.is_empty() {
         empty_popup_payload()
+    } else if is_non_prose_selection(&input) {
+        invalid_selection_popup_payload()
     } else {
         let loading_payload = loading_popup_payload(input.clone());
         let _ = store_popup_payload(state.inner(), &loading_payload);
@@ -430,6 +434,24 @@ fn empty_popup_payload() -> PopupPayload {
     }
 }
 
+fn invalid_selection_popup_payload() -> PopupPayload {
+    let output = "CorteX copied a file or system ID instead of normal text. Select the sentence you want to rewrite, then press Ctrl + Alt + Z again.".to_string();
+    let character_count = output.chars().count();
+    PopupPayload {
+        input: String::new(), output, mode: RewriteMode::FixGrammar, provider: ProviderId::Offline,
+        used_offline_fallback: true, character_count, elapsed_ms: 0,
+        source: "shortcut".to_string(), loading: false,
+    }
+}
+
+fn is_non_prose_selection(input: &str) -> bool {
+    let parts: Vec<&str> = input.trim().split('-').collect();
+    let uuid_lengths = [8, 4, 4, 4, 12];
+    parts.len() == uuid_lengths.len() && parts.iter().zip(uuid_lengths).all(|(part, expected_length)| {
+        part.len() == expected_length && part.bytes().all(|byte| byte.is_ascii_hexdigit())
+    })
+}
+
 fn loading_popup_payload(input: String) -> PopupPayload {
     PopupPayload {
         input,
@@ -460,7 +482,7 @@ fn error_popup_payload(error: String) -> PopupPayload {
 
 #[cfg(test)]
 mod provider_guide_tests {
-    use super::is_allowed_provider_guide;
+    use super::{is_allowed_provider_guide, is_non_prose_selection};
 
     #[test]
     fn allows_only_known_https_provider_guides() {
@@ -471,5 +493,11 @@ mod provider_guide_tests {
         assert!(is_allowed_provider_guide(&allowed));
         assert!(!is_allowed_provider_guide(&wrong_scheme));
         assert!(!is_allowed_provider_guide(&wrong_host));
+    }
+
+    #[test]
+    fn detects_uuid_values_that_are_not_writing() {
+        assert!(is_non_prose_selection("019f30fc-8b49-7022-b19f-7f1878543c00"));
+        assert!(!is_non_prose_selection("Hey, I am going to sleep."));
     }
 }
