@@ -8,15 +8,22 @@ mod state;
 mod text;
 mod tray;
 
-use tauri::Manager;
+use tauri::{Manager, RunEvent};
 
 pub fn run() {
-    tauri::Builder::default()
+    let show_on_ready = !std::env::args().any(|argument| argument == "--background");
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             if !args.iter().any(|argument| argument == "--background") {
+                // Return from the IPC callback before touching the window. This lets
+                // the second process exit immediately and avoids cross-process hangs.
                 let app_handle = app.clone();
-                let _ = app.run_on_main_thread(move || {
-                    let _ = desktop::show_main_window(&app_handle);
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(40));
+                    let restore_handle = app_handle.clone();
+                    let _ = app_handle.run_on_main_thread(move || {
+                        let _ = desktop::show_main_window(&restore_handle);
+                    });
                 });
             }
         }))
@@ -30,19 +37,12 @@ pub fn run() {
             app.manage(state);
             let _ = desktop::prepare_popup_window(app.handle());
             tray::create(app.handle())?;
-            shortcuts::register(app)?;
-            let _ = desktop::sync_launch_at_startup(launch_at_startup);
-            if !std::env::args().any(|argument| argument == "--background") {
-                let _ = desktop::show_main_window(app.handle());
-                let app_handle = app.handle().clone();
-                std::thread::spawn(move || {
-                    std::thread::sleep(std::time::Duration::from_millis(200));
-                    let restore_handle = app_handle.clone();
-                    let _ = app_handle.run_on_main_thread(move || {
-                        let _ = desktop::show_main_window(&restore_handle);
-                    });
-                });
+            // A shortcut may temporarily be owned by another application. CorteX
+            // must still open normally even when one global shortcut cannot register.
+            if let Err(error) = shortcuts::register(app) {
+                eprintln!("CorteX shortcut registration failed: {error}");
             }
+            let _ = desktop::sync_launch_at_startup(launch_at_startup);
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -82,6 +82,12 @@ pub fn run() {
             commands::hide_popup_window,
             commands::show_main_window
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running CorteX");
+        .build(tauri::generate_context!())
+        .expect("error while building CorteX");
+
+    app.run(move |app, event| {
+        if show_on_ready && matches!(event, RunEvent::Ready) {
+            let _ = desktop::show_main_window(app);
+        }
+    });
 }
