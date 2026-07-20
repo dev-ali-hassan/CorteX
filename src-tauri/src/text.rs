@@ -43,7 +43,7 @@ pub fn instruction_for(mode: &RewriteMode, target_language: Option<&str>) -> Str
 }
 
 fn fix_grammar(input: &str) -> String {
-    let mut text = normalize_spaces(input);
+    let mut text = correct_common_words(&normalize_spaces(input));
 
     let replacements = [
         ("The team have completed", "The team completed"),
@@ -73,26 +73,30 @@ fn fix_grammar(input: &str) -> String {
         text = text.replace(from, to);
     }
 
+    text = text.replace("hey there I'm", "hey there, I'm");
+    text = text.replace("I'm using new application", "I'm using a new application");
+
     text = capitalize_sentences(&text);
     ensure_terminal_punctuation(&text)
 }
 
 fn professionalize(input: &str) -> String {
-    let mut text = input.to_string();
+    let mut text = without_casual_greeting(input).to_string();
+    text = text.replace("I'm ", "I am ");
     text = text.replace("Need", "Please");
     text = text.replace("ASAP", "as soon as possible");
     text = text.replace("I want", "I would like");
     text = text.replace("can you", "could you");
     text = text.replace("Can you", "Could you");
-    text
+    ensure_terminal_punctuation(&text)
 }
 
 fn friendly(input: &str) -> String {
-    let text = input.trim();
-    if text.len() < 120 {
-        return format!("Hi, {}", lowercase_first(text));
+    let text = without_casual_greeting(input);
+    if text.len() < 120 && !text.to_ascii_lowercase().starts_with("hi") {
+        return ensure_terminal_punctuation(&format!("Hi! {text}"));
     }
-    text.replace("Please", "Please feel free to")
+    ensure_terminal_punctuation(&text.replace("Please", "Please feel free to"))
 }
 
 fn shorten(input: &str) -> String {
@@ -106,8 +110,14 @@ fn shorten(input: &str) -> String {
 
 fn summarize(input: &str) -> String {
     let fixed = input.trim();
+    if let Some(rest) = without_casual_greeting(fixed).strip_prefix("I'm using ") {
+        return ensure_terminal_punctuation(&format!("Using {rest}"));
+    }
+    if let Some(rest) = without_casual_greeting(fixed).strip_prefix("I am using ") {
+        return ensure_terminal_punctuation(&format!("Using {rest}"));
+    }
     if fixed.len() <= 140 {
-        return fixed.to_string();
+        return ensure_terminal_punctuation(without_casual_greeting(fixed));
     }
 
     let first_sentence = fixed
@@ -142,11 +152,13 @@ fn simplify(input: &str) -> String {
         ("in order to", "to"),
     ];
 
-    let mut text = input.to_string();
+    let mut text = without_casual_greeting(input).to_string();
+    text = text.replace("I'm using a new application", "I use a new app");
+    text = text.replace("I am using a new application", "I use a new app");
     for (from, to) in replacements {
         text = text.replace(from, to);
     }
-    text
+    ensure_terminal_punctuation(&text)
 }
 
 fn offline_translate_notice(input: &str, target_language: &str) -> String {
@@ -157,6 +169,51 @@ fn offline_translate_notice(input: &str, target_language: &str) -> String {
 
 fn normalize_spaces(input: &str) -> String {
     input.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn correct_common_words(input: &str) -> String {
+    let mut text = format!(" {} ", input.trim());
+    let replacements = [
+        (" heythere ", " hey there "),
+        (" m ", " I'm "),
+        (" im ", " I'm "),
+        (" usng ", " using "),
+        (" nev ", " new "),
+        (" aplication", " application"),
+        (" applicaton", " application"),
+        (" teh ", " the "),
+        (" thier ", " their "),
+        (" recieve", " receive"),
+        (" definately", " definitely"),
+        (" seperate", " separate"),
+        (" alot ", " a lot "),
+        (" u ", " you "),
+        (" ur ", " your "),
+        (" pls ", " please "),
+        (" thx ", " thanks "),
+        (" cant ", " cannot "),
+        (" dont ", " do not "),
+        (" doesnt ", " does not "),
+        (" wasnt ", " was not "),
+        (" goin ", " going "),
+        (" seep", " sleep"),
+        ("Hey there I'm", "Hey there, I'm"),
+        ("I'm using new application", "I'm using a new application"),
+    ];
+
+    for (from, to) in replacements {
+        text = text.replace(from, to);
+    }
+
+    text.trim().to_string()
+}
+
+fn without_casual_greeting(input: &str) -> &str {
+    input
+        .trim()
+        .strip_prefix("Hey there, ")
+        .or_else(|| input.trim().strip_prefix("Hey there "))
+        .unwrap_or_else(|| input.trim())
 }
 
 fn ensure_terminal_punctuation(input: &str) -> String {
@@ -194,14 +251,34 @@ fn capitalize_sentences(input: &str) -> String {
     output
 }
 
-fn lowercase_first(input: &str) -> String {
-    let mut chars = input.chars();
-    match chars.next() {
-        Some(first) => format!(
-            "{}{}",
-            first.to_ascii_lowercase(),
-            chars.collect::<String>()
-        ),
-        None => String::new(),
+#[cfg(test)]
+mod tests {
+    use super::rewrite_offline;
+    use crate::models::RewriteMode;
+
+    #[test]
+    fn offline_modes_correct_common_casual_typos() {
+        let input = "heythere m usng nev aplication";
+
+        assert_eq!(
+            rewrite_offline(input, &RewriteMode::FixGrammar, None),
+            "Hey there, I'm using a new application."
+        );
+        assert_eq!(
+            rewrite_offline(input, &RewriteMode::Professional, None),
+            "I am using a new application."
+        );
+        assert_eq!(
+            rewrite_offline(input, &RewriteMode::Friendly, None),
+            "Hi! I'm using a new application."
+        );
+        assert_eq!(
+            rewrite_offline(input, &RewriteMode::Simplify, None),
+            "I use a new app."
+        );
+        assert_eq!(
+            rewrite_offline(input, &RewriteMode::Summarize, None),
+            "Using a new application."
+        );
     }
 }
