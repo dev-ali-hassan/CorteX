@@ -11,7 +11,7 @@ React, TypeScript, and SQLite.
 - System tray menu for opening CorteX, rewriting clipboard text, favorites,
   settings, pausing shortcuts, and exiting.
 - Global shortcuts:
-  - `Ctrl + Alt + Z`: capture selected text, rewrite it, and show the popup.
+  - `Ctrl + Alt + X`: capture selected text, rewrite it, and show the popup.
   - `Ctrl + 1`: fix grammar directly in the active app.
   - `Ctrl + 2`: rewrite professionally directly in the active app.
 - SQLite settings and rewrite history.

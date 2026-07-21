@@ -7,6 +7,8 @@ use crate::{
     state::AppState,
 };
 
+pub const FLOATING_WINDOW_SHORTCUT: &str = "Ctrl + Alt + X";
+
 pub fn register(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     app.handle().plugin(
         tauri_plugin_global_shortcut::Builder::new()
@@ -21,7 +23,7 @@ pub fn register(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     .get_settings()
                     .unwrap_or_default();
 
-                if shortcut_matches(shortcut, &settings.global_shortcut) {
+                if shortcut_matches(shortcut, FLOATING_WINDOW_SHORTCUT) {
                     let app = app.clone();
                     tauri::async_runtime::spawn(async move {
                         commands::open_popup_from_shortcut(app).await;
@@ -126,7 +128,7 @@ fn validated_shortcuts(settings: &AppSettings) -> Result<Vec<Shortcut>, String> 
 
 fn shortcut_entries(settings: &AppSettings) -> [(&'static str, &str); 9] {
     [
-        ("Floating Window", settings.global_shortcut.as_str()),
+        ("Floating Window", FLOATING_WINDOW_SHORTCUT),
         ("Grammar", settings.grammar_shortcut.as_str()),
         ("Professional", settings.professional_shortcut.as_str()),
         ("Friendly", settings.friendly_shortcut.as_str()),
@@ -171,6 +173,13 @@ fn is_unsafe_windows_shortcut(value: &str) -> bool {
 fn repair_saved_shortcuts(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let state = app.state::<AppState>();
     let mut settings = state.db.get_settings()?;
+
+    // Keep existing installations aligned with the fixed floating-window shortcut.
+    if settings.global_shortcut != FLOATING_WINDOW_SHORTCUT {
+        settings.global_shortcut = FLOATING_WINDOW_SHORTCUT.to_string();
+        state.db.save_settings(&settings)?;
+    }
+
     if validate_shortcuts(&settings).is_ok() {
         return Ok(());
     }

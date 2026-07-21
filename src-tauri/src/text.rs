@@ -174,6 +174,18 @@ fn normalize_spaces(input: &str) -> String {
 fn correct_common_words(input: &str) -> String {
     let mut text = format!(" {} ", input.trim());
     let replacements = [
+        (" ths ", " this "),
+        (" Ths ", " This "),
+        (" thsi ", " this "),
+        (" frst ", " first "),
+        (" Frst ", " First "),
+        (" projeckt ", " project "),
+        (" proejct ", " project "),
+        (" proyect ", " project "),
+        (" wrks ", " works "),
+        (" wrk ", " work "),
+        (" I hop it ", " I hope it "),
+        (" i hop it ", " I hope it "),
         (" heythere ", " hey there "),
         (" m ", " I'm "),
         (" im ", " I'm "),
@@ -279,6 +291,16 @@ mod tests {
         assert_eq!(
             rewrite_offline(input, &RewriteMode::Summarize, None),
             "Using a new application."
+        );
+    }
+
+    #[test]
+    fn fix_grammar_corrects_common_missing_letter_and_phonetic_typos() {
+        let input = "Ths is my frst projeckt and I hop it wrks";
+
+        assert_eq!(
+            rewrite_offline(input, &RewriteMode::FixGrammar, None),
+            "This is my first project and I hope it works."
         );
     }
 }

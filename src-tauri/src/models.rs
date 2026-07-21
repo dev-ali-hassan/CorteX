@@ -108,6 +108,8 @@ impl Default for ProviderSettings {
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     pub theme: String,
+    #[serde(default = "default_popup_theme")]
+    pub popup_theme: String,
     pub accent_color: String,
     pub launch_at_startup: bool,
     #[serde(default = "default_minimize_to_tray")]
@@ -139,6 +141,7 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             theme: "system".to_string(),
+            popup_theme: default_popup_theme(),
             accent_color: "#8b5cf6".to_string(),
             launch_at_startup: false,
             minimize_to_tray: true,
@@ -146,7 +149,7 @@ impl Default for AppSettings {
             auto_copy: false,
             default_language: "English".to_string(),
             custom_prompt: String::new(),
-            global_shortcut: "Ctrl + Alt + Z".to_string(),
+            global_shortcut: "Ctrl + Alt + X".to_string(),
             grammar_shortcut: "Ctrl + 1".to_string(),
             professional_shortcut: "Ctrl + 2".to_string(),
             friendly_shortcut: default_friendly_shortcut(),
@@ -162,6 +165,10 @@ impl Default for AppSettings {
 
 fn default_minimize_to_tray() -> bool {
     true
+}
+
+fn default_popup_theme() -> String {
+    "dark".to_string()
 }
 
 fn default_friendly_shortcut() -> String {

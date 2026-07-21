@@ -13,10 +13,13 @@ import {
 import {
   copyText,
   getPopupPayload,
+  getSettings,
   hideCurrentWindow,
   listenToPopupPayload,
+  listenToSettingsUpdates,
   replaceSelectedText,
   rewriteText,
+  setWindowTheme,
   startCurrentWindowDrag,
   type PopupPayload
 } from "./lib/desktop";
@@ -48,10 +51,21 @@ function PopupApp() {
   const [payload, setPayload] = useState(initialPayload);
   const [mode, setMode] = useState<RewriteModeId>("fixGrammar");
   const [busy, setBusy] = useState(false);
+  const [panelTheme, setPanelTheme] = useState<"system" | "dark" | "light">("dark");
+  const [systemPrefersDark, setSystemPrefersDark] = useState(() =>
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  );
   const visibleCharacterCount = Array.from(payload.output || "").length;
   const characterLimit = Math.max(1000, visibleCharacterCount);
 
   useEffect(() => {
+    const applySettings = (settings: { popupTheme?: string }) => {
+      setPanelTheme(
+        settings.popupTheme === "light" || settings.popupTheme === "system" ? settings.popupTheme : "dark"
+      );
+    };
+
+    void getSettings().then(applySettings).catch(() => undefined);
     getPopupPayload().then((value) => {
       if (value) {
         setPayload(value);
@@ -65,7 +79,23 @@ function PopupApp() {
       setMode(value.mode);
       setBusy(Boolean(value.loading));
     }).then((unlisten) => () => unlisten());
+
+    listenToSettingsUpdates(applySettings).then((unlisten) => () => unlisten());
   }, []);
+
+  useEffect(() => {
+    const colorScheme = window.matchMedia("(prefers-color-scheme: dark)");
+    const syncSystemTheme = () => setSystemPrefersDark(colorScheme.matches);
+    colorScheme.addEventListener("change", syncSystemTheme);
+    return () => colorScheme.removeEventListener("change", syncSystemTheme);
+  }, []);
+
+  const activePanelTheme = panelTheme === "system" ? (systemPrefersDark ? "dark" : "light") : panelTheme;
+
+  useEffect(() => {
+    document.documentElement.style.colorScheme = activePanelTheme;
+    void setWindowTheme(activePanelTheme).catch(() => undefined);
+  }, [activePanelTheme]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -123,7 +153,7 @@ function PopupApp() {
   }
 
   return (
-    <main className="popup-root" aria-label="CorteX floating rewrite popup">
+    <main className="popup-root" data-theme={activePanelTheme} aria-label="CorteX floating rewrite popup">
       <section className="popup-card">
         <header className="popup-titlebar" onPointerDownCapture={handleTitlebarPointerDown}>
           <div className="popup-brand">
@@ -162,7 +192,7 @@ function PopupApp() {
           </div>
           <div className={clsx("popup-output-box", busy && "rewriting")} role="textbox" aria-readonly="true" tabIndex={0}>
             <div className="popup-output-copy" aria-live="polite">
-              {busy ? "Rewriting..." : payload.output || `Ready to ${modeLabel(mode).toLowerCase()}. Select text and use Ctrl + Alt + Z.`}
+              {busy ? "Rewriting..." : payload.output || `Ready to ${modeLabel(mode).toLowerCase()}. Select text and use Ctrl + Alt + X.`}
             </div>
             <span className="popup-character-count">
               {visibleCharacterCount.toLocaleString()} / {characterLimit.toLocaleString()}
