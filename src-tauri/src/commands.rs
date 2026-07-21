@@ -1,6 +1,6 @@
 use std::{sync::atomic::Ordering, time::Instant};
 
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::{
     desktop,
@@ -94,8 +94,9 @@ pub fn get_settings(state: State<'_, AppState>) -> Result<AppSettings, String> {
 pub fn save_settings(
     app: AppHandle,
     state: State<'_, AppState>,
-    settings: AppSettings,
+    mut settings: AppSettings,
 ) -> Result<AppSettings, String> {
+    settings.global_shortcut = shortcuts::FLOATING_WINDOW_SHORTCUT.to_string();
     shortcuts::validate_shortcuts(&settings)?;
     let previous = state.db.get_settings()?;
     desktop::sync_launch_at_startup(settings.launch_at_startup)?;
@@ -106,6 +107,7 @@ pub fn save_settings(
         let _ = shortcuts::sync_registered_shortcuts(&app);
         return Err(format!("Could not activate that shortcut: {error}"));
     }
+    let _ = app.emit_to("popup", "settings-updated", saved.clone());
     Ok(saved)
 }
 
@@ -419,7 +421,7 @@ fn store_popup_payload(state: &AppState, payload: &PopupPayload) -> Result<(), S
 
 fn empty_popup_payload() -> PopupPayload {
     let output =
-        "Select text in any app, then press Ctrl + Alt + Z to rewrite it here.".to_string();
+        "Select text in any app, then press Ctrl + Alt + X to rewrite it here.".to_string();
     let character_count = output.chars().count();
     PopupPayload {
         input: String::new(),
@@ -435,7 +437,7 @@ fn empty_popup_payload() -> PopupPayload {
 }
 
 fn invalid_selection_popup_payload() -> PopupPayload {
-    let output = "CorteX copied a file or system ID instead of normal text. Select the sentence you want to rewrite, then press Ctrl + Alt + Z again.".to_string();
+    let output = "CorteX copied a file or system ID instead of normal text. Select the sentence you want to rewrite, then press Ctrl + Alt + X again.".to_string();
     let character_count = output.chars().count();
     PopupPayload {
         input: String::new(), output, mode: RewriteMode::FixGrammar, provider: ProviderId::Offline,

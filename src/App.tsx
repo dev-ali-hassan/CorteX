@@ -874,7 +874,7 @@ function SettingsView({
     sectionMatches(["ai", "provider", "api key", "test connection", "gemini", "groq", "openai", "openrouter", "anthropic", "mistral", "cohere", "xai", "grok", "deepseek", "ollama"]),
     sectionMatches(["general", "startup", "auto copy", "auto replace", "behavior"]),
     sectionMatches(["shortcuts", "floating window", "grammar", "professional", "friendly", "shorter", "translate", "summarize", "confident", "simplify"]),
-    sectionMatches(["appearance", "theme", "dark", "light", "system", "windows", "recommended"]),
+    sectionMatches(["appearance", "theme", "panel", "popup", "floating", "dark", "light", "system", "windows", "recommended"]),
     sectionMatches(["privacy", "stored locally", "analytics", "cloud storage"])
   ];
   const [showAI, showGeneral, showShortcuts, showAppearance, showPrivacy] = visibleSections;
@@ -952,7 +952,13 @@ function SettingsView({
         {showShortcuts && (
         <div className="settings-section settings-card" id="shortcuts-section">
           <h2>Shortcuts</h2>
-          <ShortcutRecorder label="Floating Window" value={settings.globalShortcut} onChange={(globalShortcut) => update({ globalShortcut })} />
+          <div className="shortcut-recorder">
+            <div>
+              <span>Floating Window</span>
+              <small>Current: Ctrl + Alt + X</small>
+            </div>
+            <span className="shortcut-fixed">Fixed</span>
+          </div>
           <ShortcutRecorder label="Grammar" value={settings.grammarShortcut} onChange={(grammarShortcut) => update({ grammarShortcut })} />
           <ShortcutRecorder
             label="Professional"
@@ -990,6 +996,44 @@ function SettingsView({
                 type="button"
                 aria-pressed={settings.theme === value}
                 onClick={() => onThemeChange(value as AppSettings["theme"])}
+              >
+                <span className={clsx("theme-preview", `theme-preview-${value}`)} aria-hidden="true">
+                  <span className="theme-preview-bar" />
+                  <span className="theme-preview-window">
+                    <i />
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                </span>
+                <span className="theme-choice-heading">
+                  <ThemeIcon size={16} aria-hidden="true" />
+                  <span className="theme-choice-label">{label}</span>
+                  {recommended && <small>Recommended</small>}
+                </span>
+                <span className="theme-choice-description">{description}</span>
+              </button>
+            ))}
+          </div>
+          <div className="theme-options panel-theme-options" role="radiogroup" aria-label="Floating panel theme">
+            <span className="theme-options-label">Floating panel theme</span>
+            {[
+              { value: "dark", label: "Dark", description: "Keep the floating rewrite panel dark.", icon: Moon },
+              { value: "light", label: "Light", description: "Use a bright floating rewrite panel.", icon: Sun },
+              {
+                value: "system",
+                label: "System",
+                description: "Follow your current Windows appearance.",
+                icon: Monitor,
+                recommended: true
+              }
+            ].map(({ value, label, description, icon: ThemeIcon, recommended }) => (
+              <button
+                className={clsx("theme-choice", settings.popupTheme === value && "selected")}
+                key={value}
+                type="button"
+                aria-pressed={settings.popupTheme === value}
+                onClick={() => update({ popupTheme: value as AppSettings["popupTheme"] })}
               >
                 <span className={clsx("theme-preview", `theme-preview-${value}`)} aria-hidden="true">
                   <span className="theme-preview-bar" />

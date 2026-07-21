@@ -2562,6 +2562,17 @@ kbd {
   color: #fff;
 }
 
+.shortcut-recorder .shortcut-fixed {
+  justify-self: stretch;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 9px;
+  background: rgba(139, 92, 246, 0.12);
+  padding: 8px 12px;
+  color: #c4b5fd;
+  font-size: 13px;
+  text-align: center;
+}
+
 .theme-options {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -5135,4 +5146,74 @@ kbd {
 .mode-grid > .mode-tile:first-child.selected::after {
   inset: -1px 0 -1px -1px;
   border-radius: 13px 6px 6px 13px;
+}
+
+.panel-theme-options {
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.popup-root[data-theme="light"] .popup-card {
+  border-color: rgba(109, 93, 252, 0.7);
+  background:
+    linear-gradient(118deg, rgba(109, 93, 252, 0.1), transparent 38%),
+    linear-gradient(300deg, rgba(37, 153, 232, 0.08), transparent 35%),
+    #f7f9fd;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.94),
+    0 12px 34px rgba(51, 65, 85, 0.2),
+    0 0 20px rgba(109, 93, 252, 0.14);
+}
+
+.popup-root[data-theme="light"] .popup-titlebar,
+.popup-root[data-theme="light"] .popup-mode-tabs,
+.popup-root[data-theme="light"] .popup-footer {
+  border-color: rgba(30, 41, 59, 0.12);
+}
+
+.popup-root[data-theme="light"] .popup-brand strong,
+.popup-root[data-theme="light"] .popup-output-copy {
+  color: #182033;
+}
+
+.popup-root[data-theme="light"] .popup-window-actions button,
+.popup-root[data-theme="light"] .popup-output-heading h1,
+.popup-root[data-theme="light"] .popup-character-count,
+.popup-root[data-theme="light"] .popup-status .popup-elapsed {
+  color: #667085;
+}
+
+.popup-root[data-theme="light"] .popup-window-actions kbd,
+.popup-root[data-theme="light"] .popup-mode-tabs button,
+.popup-root[data-theme="light"] .popup-footer .ghost-action {
+  border-color: rgba(51, 65, 85, 0.16);
+  background: rgba(255, 255, 255, 0.76);
+  color: #526076;
+}
+
+.popup-root[data-theme="light"] .popup-window-actions button:hover,
+.popup-root[data-theme="light"] .popup-mode-tabs button:hover,
+.popup-root[data-theme="light"] .popup-footer .ghost-action:hover {
+  border-color: rgba(109, 93, 252, 0.42);
+  background: rgba(109, 93, 252, 0.08);
+  color: #32276f;
+}
+
+.popup-root[data-theme="light"] .popup-mode-tabs button.active {
+  border-color: #7657ed;
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.2), rgba(109, 93, 252, 0.12));
+  color: #372580;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 0 14px rgba(124, 58, 237, 0.12);
+}
+
+.popup-root[data-theme="light"] .popup-output-box {
+  border-color: rgba(51, 65, 85, 0.16);
+  background: rgba(255, 255, 255, 0.84);
+  color: #182033;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96);
+}
+
+.popup-root[data-theme="light"] .popup-status .popup-ready {
+  color: #168a4a;
 }

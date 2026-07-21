@@ -29,6 +29,7 @@ export type ProviderSettings = {
 
 export type AppSettings = {
   theme: "system" | "dark" | "light";
+  popupTheme: "system" | "dark" | "light";
   accentColor: string;
   launchAtStartup: boolean;
   minimizeToTray: boolean;
@@ -72,6 +73,7 @@ export type PopupPayload = RewriteResponse & {
 
 export const defaultSettings: AppSettings = {
   theme: "system",
+  popupTheme: "dark",
   accentColor: "#8b5cf6",
   launchAtStartup: false,
   minimizeToTray: true,
@@ -79,7 +81,7 @@ export const defaultSettings: AppSettings = {
   autoCopy: false,
   defaultLanguage: "English",
   customPrompt: "",
-  globalShortcut: "Ctrl + Alt + Z",
+  globalShortcut: "Ctrl + Alt + X",
   grammarShortcut: "Ctrl + 1",
   professionalShortcut: "Ctrl + 2",
   friendlyShortcut: "Ctrl + 3",
@@ -209,6 +211,14 @@ export function listenToTrayNavigation(onRoute: (route: string) => void) {
   }
 
   return listen<string>("tray-navigate", (event) => onRoute(event.payload));
+}
+
+export function listenToSettingsUpdates(onSettings: (settings: AppSettings) => void) {
+  if (!isTauri()) {
+    return Promise.resolve(() => undefined);
+  }
+
+  return listen<AppSettings>("settings-updated", (event) => onSettings(event.payload));
 }
 
 function mockCommand<T>(command: string, args?: Record<string, unknown>): Promise<T> {
