@@ -49,7 +49,22 @@ fn fix_grammar(input: &str) -> String {
         ("The team have completed", "The team completed"),
         ("the team have completed", "the team completed"),
         (" team have ", " team has "),
+        ("I is ", "I am "),
+        ("I are ", "I am "),
+        ("You is ", "You are "),
+        ("We is ", "We are "),
+        ("They is ", "They are "),
+        ("He are ", "He is "),
+        ("She are ", "She is "),
+        ("It are ", "It is "),
         (" it were ", " it was "),
+        (" could of ", " could have "),
+        (" should of ", " should have "),
+        (" would of ", " would have "),
+        (" did not went ", " did not go "),
+        (" do not knows ", " do not know "),
+        (" does not knows ", " does not know "),
+        (" more better", " better"),
         (" was sent to client", " was sent to the client"),
         (" sent to client", " sent to the client"),
         (" i ", " I "),
@@ -75,6 +90,7 @@ fn fix_grammar(input: &str) -> String {
 
     text = text.replace("hey there I'm", "hey there, I'm");
     text = text.replace("I'm using new application", "I'm using a new application");
+    text = tidy_punctuation(&text);
 
     text = capitalize_sentences(&text);
     ensure_terminal_punctuation(&text)
@@ -83,29 +99,82 @@ fn fix_grammar(input: &str) -> String {
 fn professionalize(input: &str) -> String {
     let mut text = without_casual_greeting(input).to_string();
     text = text.replace("I'm ", "I am ");
-    text = text.replace("Need", "Please");
+    text = text.replace("I've ", "I have ");
+    text = text.replace("We'll ", "We will ");
+    text = text.replace("we'll ", "we will ");
+    text = text.replace("can't", "cannot");
+    text = text.replace("won't", "will not");
+    text = text.replace("Need ", "Please provide ");
     text = text.replace("ASAP", "as soon as possible");
     text = text.replace("I want", "I would like");
-    text = text.replace("can you", "could you");
-    text = text.replace("Can you", "Could you");
-    ensure_terminal_punctuation(&text)
+    text = text.replace("Can you please", "Could you please");
+    text = text.replace("can you please", "could you please");
+    text = text.replace("Can you", "Could you please");
+    text = text.replace("can you", "could you please");
+    text = text.replace("get back to me", "respond");
+    text = text.replace("a lot of", "many");
+    text = text.replace("Thanks", "Thank you");
+    ensure_terminal_punctuation(&capitalize_sentences(&text))
 }
 
 fn friendly(input: &str) -> String {
-    let text = without_casual_greeting(input);
+    let owned = input
+        .replace("Could you please", "Would you mind")
+        .replace("Please provide", "Please share");
+    let text = without_casual_greeting(&owned);
     if text.len() < 120 && !text.to_ascii_lowercase().starts_with("hi") {
         return ensure_terminal_punctuation(&format!("Hi! {text}"));
     }
-    ensure_terminal_punctuation(&text.replace("Please", "Please feel free to"))
+    ensure_terminal_punctuation(text)
 }
 
 fn shorten(input: &str) -> String {
-    let words: Vec<&str> = input.split_whitespace().collect();
-    if words.len() <= 18 {
-        return input.to_string();
+    let mut text = remove_filler(input);
+    let phrase_replacements = [
+        ("in order to", "to"),
+        ("at this point in time", "now"),
+        ("due to the fact that", "because"),
+        ("has the ability to", "can"),
+        ("for the purpose of", "to"),
+        ("a large number of", "many"),
+        ("as soon as possible", "soon"),
+    ];
+    for (from, to) in phrase_replacements {
+        text = text.replace(from, to).replace(&capitalize_first(from), &capitalize_first(to));
     }
-    let compressed = words.iter().take(18).copied().collect::<Vec<_>>().join(" ");
-    ensure_terminal_punctuation(&compressed)
+
+    let sentences = sentences(&text);
+    if word_count(&text) <= 24 && sentences.len() <= 2 {
+        return ensure_terminal_punctuation(&capitalize_sentences(&text));
+    }
+
+    if sentences.len() <= 1 {
+        let clauses: Vec<&str> = text
+            .split(|character| matches!(character, ',' | ';' | '—'))
+            .map(str::trim)
+            .filter(|clause| !clause.is_empty())
+            .collect();
+        if clauses.len() > 1 {
+            let first = clauses[0];
+            if let Some(key) = clauses.iter().skip(1).find(|clause| contains_key_signal(clause)) {
+                return ensure_terminal_punctuation(&format!("{first}, {key}"));
+            }
+            return ensure_terminal_punctuation(first);
+        }
+        return ensure_terminal_punctuation(&text);
+    }
+
+    let first = sentences[0].clone();
+    let second = sentences
+        .iter()
+        .skip(1)
+        .find(|sentence| contains_key_signal(sentence));
+    match second {
+        Some(sentence) if word_count(&first) + word_count(sentence) <= 32 => {
+            format!("{} {}", ensure_terminal_punctuation(&capitalize_sentences(&first)), ensure_terminal_punctuation(sentence))
+        }
+        _ => ensure_terminal_punctuation(&capitalize_sentences(&first)),
+    }
 }
 
 fn summarize(input: &str) -> String {
@@ -116,27 +185,47 @@ fn summarize(input: &str) -> String {
     if let Some(rest) = without_casual_greeting(fixed).strip_prefix("I am using ") {
         return ensure_terminal_punctuation(&format!("Using {rest}"));
     }
-    if fixed.len() <= 140 {
+    if word_count(fixed) <= 24 {
         return ensure_terminal_punctuation(without_casual_greeting(fixed));
     }
 
-    let first_sentence = fixed
-        .split_terminator(|character| matches!(character, '.' | '!' | '?'))
-        .next()
-        .unwrap_or(fixed)
-        .trim();
-    ensure_terminal_punctuation(first_sentence)
+    let cleaned = remove_filler(without_casual_greeting(fixed));
+    let all = sentences(&cleaned);
+    if all.len() <= 1 {
+        return shorten(&cleaned);
+    }
+    let first = all.first().map(String::as_str).unwrap_or(cleaned.as_str());
+    let key = all
+        .iter()
+        .skip(1)
+        .find(|sentence| contains_key_signal(sentence));
+    match key {
+        Some(sentence) if word_count(first) + word_count(sentence) <= 38 => {
+            format!("{} {}", ensure_terminal_punctuation(first), ensure_terminal_punctuation(sentence))
+        }
+        _ => ensure_terminal_punctuation(first),
+    }
 }
 
 fn confident(input: &str) -> String {
     let mut text = input.to_string();
     text = text.replace("I think ", "");
+    text = text.replace("I believe ", "");
+    text = text.replace("I feel that ", "");
+    text = text.replace("It seems that ", "");
+    text = text.replace("it seems that ", "");
     text = text.replace("maybe ", "");
+    text = text.replace("Maybe ", "");
     text = text.replace("perhaps ", "");
+    text = text.replace("Perhaps ", "");
     text = text.replace("we might ", "we will ");
     text = text.replace("We might ", "We will ");
+    text = text.replace("we hope to ", "we will ");
+    text = text.replace("We hope to ", "We will ");
+    text = text.replace("I hope to ", "I will ");
+    text = text.replace("could possibly", "can");
     text = text.replace("should be able to", "can");
-    text
+    ensure_terminal_punctuation(&capitalize_sentences(text.trim()))
 }
 
 fn simplify(input: &str) -> String {
@@ -150,6 +239,13 @@ fn simplify(input: &str) -> String {
         ("prior to", "before"),
         ("subsequent to", "after"),
         ("in order to", "to"),
+        ("at this point in time", "now"),
+        ("due to the fact that", "because"),
+        ("with regard to", "about"),
+        ("make a decision", "decide"),
+        ("provide assistance", "help"),
+        ("has the ability to", "can"),
+        ("a sufficient number of", "enough"),
     ];
 
     let mut text = without_casual_greeting(input).to_string();
@@ -159,6 +255,97 @@ fn simplify(input: &str) -> String {
         text = text.replace(from, to);
     }
     ensure_terminal_punctuation(&text)
+}
+
+fn remove_filler(input: &str) -> String {
+    let mut text = input.to_string();
+    let fillers = [
+        "Basically, ",
+        "basically, ",
+        "Actually, ",
+        "actually, ",
+        "To be honest, ",
+        "to be honest, ",
+        "As a matter of fact, ",
+        "as a matter of fact, ",
+        "I just wanted to say that ",
+        "I wanted to let you know that ",
+        "It is important to note that ",
+    ];
+    for filler in fillers {
+        text = text.replace(filler, "");
+    }
+    normalize_spaces(&text)
+}
+
+fn sentences(input: &str) -> Vec<String> {
+    let mut result = Vec::new();
+    let mut current = String::new();
+    for character in input.chars() {
+        current.push(character);
+        if matches!(character, '.' | '!' | '?') {
+            let sentence = current.trim();
+            if !sentence.is_empty() {
+                result.push(sentence.to_string());
+            }
+            current.clear();
+        }
+    }
+    let remaining = current.trim();
+    if !remaining.is_empty() {
+        result.push(remaining.to_string());
+    }
+    result
+}
+
+fn word_count(input: &str) -> usize {
+    input.split_whitespace().count()
+}
+
+fn contains_key_signal(input: &str) -> bool {
+    let lower = input.to_ascii_lowercase();
+    [
+        "must", "need", "will", "result", "because", "deadline", "risk", "recommend",
+        "next", "action", "important", "therefore", "however",
+    ]
+    .iter()
+    .any(|signal| lower.split(|character: char| !character.is_ascii_alphabetic()).any(|word| word == *signal))
+}
+
+fn capitalize_first(input: &str) -> String {
+    let mut characters = input.chars();
+    match characters.next() {
+        Some(first) => format!("{}{}", first.to_ascii_uppercase(), characters.as_str()),
+        None => String::new(),
+    }
+}
+
+fn tidy_punctuation(input: &str) -> String {
+    let mut text = input.to_string();
+    for (from, to) in [
+        (" ,", ","),
+        (" .", "."),
+        (" !", "!"),
+        (" ?", "?"),
+        (" ;", ";"),
+        (" :", ":"),
+        (",,", ","),
+        ("..", "."),
+    ] {
+        text = text.replace(from, to);
+    }
+
+    let mut output = String::with_capacity(text.len() + 4);
+    let chars: Vec<char> = text.chars().collect();
+    for (index, character) in chars.iter().enumerate() {
+        output.push(*character);
+        if matches!(character, ',' | ';' | ':')
+            && chars.get(index + 1).is_some_and(|next| !next.is_whitespace())
+        {
+            output.push(' ');
+        }
+    }
+    normalize_spaces(&output)
 }
 
 fn offline_translate_notice(input: &str, target_language: &str) -> String {
@@ -195,6 +382,15 @@ fn correct_common_words(input: &str) -> String {
         (" applicaton", " application"),
         (" teh ", " the "),
         (" thier ", " their "),
+        (" wierd ", " weird "),
+        (" becuase ", " because "),
+        (" goverment ", " government "),
+        (" enviroment ", " environment "),
+        (" untill ", " until "),
+        (" wich ", " which "),
+        (" woud ", " would "),
+        (" shoud ", " should "),
+        (" cud ", " could "),
         (" recieve", " receive"),
         (" definately", " definitely"),
         (" seperate", " separate"),
@@ -206,6 +402,10 @@ fn correct_common_words(input: &str) -> String {
         (" cant ", " cannot "),
         (" dont ", " do not "),
         (" doesnt ", " does not "),
+        (" didnt ", " did not "),
+        (" couldnt ", " could not "),
+        (" wouldnt ", " would not "),
+        (" shouldnt ", " should not "),
         (" wasnt ", " was not "),
         (" goin ", " going "),
         (" seep", " sleep"),
@@ -301,6 +501,36 @@ mod tests {
         assert_eq!(
             rewrite_offline(input, &RewriteMode::FixGrammar, None),
             "This is my first project and I hope it works."
+        );
+    }
+
+    #[test]
+    fn grammar_fixes_agreement_and_common_misused_phrases() {
+        let input = "I is sure we could of done more better, but it were sent to client";
+        assert_eq!(
+            rewrite_offline(input, &RewriteMode::FixGrammar, None),
+            "I am sure we could have done better, but it was sent to the client."
+        );
+    }
+
+    #[test]
+    fn shorter_keeps_complete_high_value_sentences() {
+        let input = "Basically, the team completed the first design yesterday. The client must approve it before Friday. We also discussed several optional ideas for a later release.";
+        assert_eq!(
+            rewrite_offline(input, &RewriteMode::Shorter, None),
+            "The team completed the first design yesterday. The client must approve it before Friday."
+        );
+    }
+
+    #[test]
+    fn professional_and_confident_remove_casual_or_uncertain_language() {
+        assert_eq!(
+            rewrite_offline("Hey there can you get back to me ASAP", &RewriteMode::Professional, None),
+            "Could you please respond as soon as possible."
+        );
+        assert_eq!(
+            rewrite_offline("I think we might finish and should be able to ship", &RewriteMode::Confident, None),
+            "We will finish and can ship."
         );
     }
 }

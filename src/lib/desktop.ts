@@ -240,7 +240,7 @@ function mockCommand<T>(command: string, args?: Record<string, unknown>): Promis
       return Promise.reject(new Error("Connect an AI provider to use Custom Prompt."));
     }
     const output = request?.input?.trim()
-      ? browserRewriteFallback(request.input, request.mode)
+      ? browserRewriteFallback(request.input, request.mode, request.targetLanguage)
       : defaultOutput;
 
     return Promise.resolve({
@@ -261,25 +261,74 @@ function mockCommand<T>(command: string, args?: Record<string, unknown>): Promis
   return Promise.resolve(undefined as T);
 }
 
-function browserRewriteFallback(input: string, mode: RewriteModeId) {
-  const cleaned = input
-    .replace(/\bThe team have\b/gi, "The team")
+function browserRewriteFallback(input: string, mode: RewriteModeId, targetLanguage?: string) {
+  const punctuate = (value: string) => /[.!?]$/.test(value.trim()) ? value.trim() : `${value.trim()}.`;
+  const withoutGreeting = (value: string) => value.replace(/^hey(?: there)?[,!]?\s*/i, "");
+  let cleaned = input
+    .replace(/\b(?:could|should|would) of\b/gi, (value) => value.replace(/ of$/i, " have"))
+    .replace(/\bmore better\b/gi, "better")
+    .replace(/\bI (?:is|are)\b/g, "I am")
+    .replace(/\b(you|we|they) is\b/gi, "$1 are")
+    .replace(/\b(he|she|it) are\b/gi, "$1 is")
+    .replace(/\bThe team have completed\b/gi, "The team completed")
     .replace(/\bit were\b/gi, "it was")
     .replace(/\bto client\b/gi, "to the client")
+    .replace(/\b(ths|thsi)\b/gi, "this")
+    .replace(/\bteh\b/gi, "the")
+    .replace(/\brecieve\b/gi, "receive")
+    .replace(/\bdefinately\b/gi, "definitely")
+    .replace(/\balot\b/gi, "a lot")
+    .replace(/\bim\b/gi, "I'm")
+    .replace(/\bdont\b/gi, "do not")
+    .replace(/\bcant\b/gi, "cannot")
+    .replace(/\s+([,.!?;:])/g, "$1")
     .replace(/\s+/g, " ")
     .trim();
+  cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 
   if (mode === "professional") {
-    return `The team completed the report yesterday, and it was sent to the client.`;
+    cleaned = withoutGreeting(cleaned)
+      .replace(/\bI'm\b/g, "I am")
+      .replace(/\bI want\b/gi, "I would like")
+      .replace(/\bcan you(?: please)?\b/gi, "Could you please")
+      .replace(/\bget back to me\b/gi, "respond")
+      .replace(/\bASAP\b/g, "as soon as possible");
+    return punctuate(cleaned);
   }
 
   if (mode === "friendly") {
-    return `The team completed the report yesterday, and it has been sent to the client.`;
+    const body = withoutGreeting(cleaned);
+    return punctuate(body.length < 120 ? `Hi! ${body}` : body);
   }
 
-  if (mode === "shorter") {
-    return `The report was completed yesterday and sent to the client.`;
+  if (mode === "shorter" || mode === "summarize") {
+    cleaned = withoutGreeting(cleaned)
+      .replace(/\b(?:basically|actually|to be honest),?\s*/gi, "")
+      .replace(/\bin order to\b/gi, "to")
+      .replace(/\bdue to the fact that\b/gi, "because");
+    const sentences = cleaned.match(/[^.!?]+[.!?]?/g)?.map((sentence) => sentence.trim()) ?? [cleaned];
+    const key = sentences.slice(1).find((sentence) => /\b(must|need|will|deadline|risk|recommend|important)\b/i.test(sentence));
+    return [sentences[0], key].filter(Boolean).map((sentence) => punctuate(sentence!)).join(" ");
   }
 
-  return cleaned.endsWith(".") ? cleaned : `${cleaned}.`;
+  if (mode === "confident") {
+    cleaned = cleaned
+      .replace(/^(?:I think|I believe|It seems that|Maybe|Perhaps)\s+/i, "")
+      .replace(/\bwe might\b/gi, "we will")
+      .replace(/\bshould be able to\b/gi, "can");
+  }
+
+  if (mode === "simplify") {
+    const simple: Record<string, string> = {
+      utilize: "use", approximately: "about", commence: "start", terminate: "end",
+      purchase: "buy", assist: "help", "prior to": "before", "in order to": "to"
+    };
+    for (const [from, to] of Object.entries(simple)) cleaned = cleaned.replace(new RegExp(`\\b${from}\\b`, "gi"), to);
+  }
+
+  if (mode === "translate") {
+    return `Translation to ${targetLanguage || "the selected language"} requires an AI provider. Original text: ${punctuate(cleaned)}`;
+  }
+
+  return punctuate(cleaned);
 }
