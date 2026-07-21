@@ -59,28 +59,48 @@ function PopupApp() {
   const characterLimit = Math.max(1000, visibleCharacterCount);
 
   useEffect(() => {
+    let disposed = false;
+    let receivedPayloadEvent = false;
+    let stopPayloadListener: (() => void) | undefined;
+    let stopSettingsListener: (() => void) | undefined;
+
     const applySettings = (settings: { popupTheme?: string }) => {
+      if (disposed) return;
       setPanelTheme(
         settings.popupTheme === "light" || settings.popupTheme === "system" ? settings.popupTheme : "dark"
       );
     };
 
     void getSettings().then(applySettings).catch(() => undefined);
-    getPopupPayload().then((value) => {
-      if (value) {
+    void (async () => {
+      // Subscribe first. Otherwise a fast provider response can arrive between the
+      // initial state request and listener registration, leaving the panel blank.
+      stopPayloadListener = await listenToPopupPayload((value) => {
+        if (disposed) return;
+        receivedPayloadEvent = true;
+        setPayload(value);
+        setMode(value.mode);
+        setBusy(Boolean(value.loading));
+      });
+      const value = await getPopupPayload();
+      if (!disposed && value && !receivedPayloadEvent) {
         setPayload(value);
         setMode(value.mode);
         setBusy(Boolean(value.loading));
       }
-    });
+    })().catch(() => undefined);
 
-    listenToPopupPayload((value) => {
-      setPayload(value);
-      setMode(value.mode);
-      setBusy(Boolean(value.loading));
-    }).then((unlisten) => () => unlisten());
+    void listenToSettingsUpdates(applySettings)
+      .then((unlisten) => {
+        stopSettingsListener = unlisten;
+      })
+      .catch(() => undefined);
 
-    listenToSettingsUpdates(applySettings).then((unlisten) => () => unlisten());
+    return () => {
+      disposed = true;
+      stopPayloadListener?.();
+      stopSettingsListener?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -129,6 +149,14 @@ function PopupApp() {
     try {
       const response = await rewriteText({ input: source, mode: nextMode });
       setPayload({ ...response, source: "manual" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Rewrite failed. Please try again.";
+      setPayload((current) => ({
+        ...current,
+        output: message,
+        characterCount: Array.from(message).length,
+        loading: false
+      }));
     } finally {
       setBusy(false);
     }

@@ -11,6 +11,7 @@ pub struct AppState {
     pub db: Database,
     pub client: reqwest::Client,
     pub last_popup: Mutex<Option<PopupPayload>>,
+    pub last_selection_window: Mutex<Option<isize>>,
     pub shortcuts_paused: AtomicBool,
 }
 
@@ -22,6 +23,7 @@ impl AppState {
                 .user_agent("CorteX/1.0")
                 .build()?,
             last_popup: Mutex::new(None),
+            last_selection_window: Mutex::new(None),
             shortcuts_paused: AtomicBool::new(false),
         })
     }

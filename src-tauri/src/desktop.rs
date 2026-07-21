@@ -20,6 +20,7 @@ const POPUP_GAP: i32 = 14;
 pub struct CapturedText {
     pub text: String,
     pub previous_clipboard: Option<String>,
+    pub source_window: Option<isize>,
 }
 
 pub fn read_clipboard_text() -> Result<String, String> {
@@ -35,6 +36,7 @@ pub fn write_clipboard_text(text: &str) -> Result<(), String> {
 }
 
 pub fn capture_selected_text() -> Result<CapturedText, String> {
+    let source_window = foreground_window_handle();
     let previous_clipboard = read_clipboard_text().ok();
     let sentinel = format!(
         "__CORTEX_EMPTY_SELECTION_{}__",
@@ -44,9 +46,9 @@ pub fn capture_selected_text() -> Result<CapturedText, String> {
             .unwrap_or_default()
     );
 
-    // Global-shortcut modifier keys can still be physically down when the callback fires.
-    // Give Windows a moment to release them before synthesizing Ctrl+C.
-    thread::sleep(Duration::from_millis(70));
+    // Never synthesize Ctrl+C while Ctrl/Alt from the global shortcut are still held.
+    // Otherwise some editors can receive a literal `c` or lose their selection.
+    wait_for_shortcut_modifiers_release();
     write_clipboard_text(&sentinel)?;
     send_copy_shortcut()?;
     let mut copied_text = sentinel.clone();
@@ -72,15 +74,25 @@ pub fn capture_selected_text() -> Result<CapturedText, String> {
     Ok(CapturedText {
         text,
         previous_clipboard,
+        source_window,
     })
 }
 
-pub fn replace_selected_text(text: &str, previous_clipboard: Option<String>) -> Result<(), String> {
+pub fn replace_selected_text(
+    text: &str,
+    previous_clipboard: Option<String>,
+    target_window: Option<isize>,
+) -> Result<(), String> {
     let restore_clipboard = previous_clipboard.or_else(|| read_clipboard_text().ok());
     write_clipboard_text(text)?;
-    thread::sleep(Duration::from_millis(35));
+    if let Some(target) = target_window {
+        restore_foreground_window(target);
+        thread::sleep(Duration::from_millis(90));
+    }
+    wait_for_shortcut_modifiers_release();
+    thread::sleep(Duration::from_millis(45));
     send_paste_shortcut()?;
-    thread::sleep(Duration::from_millis(110));
+    thread::sleep(Duration::from_millis(180));
 
     if let Some(previous) = restore_clipboard.as_deref() {
         let _ = write_clipboard_text(previous);
@@ -150,13 +162,18 @@ fn present_popup_window(
 
     let _ = popup.unminimize();
     let _ = popup.set_always_on_top(true);
-    popup.show().map_err(|error| error.to_string())?;
     if take_focus {
-        popup.set_focus().map_err(|error| error.to_string())?;
+        popup.show().map_err(|error| error.to_string())?;
+    } else {
+        show_window_without_activation(&popup)?;
     }
     popup
         .emit("popup-context", payload.clone())
         .map_err(|error| error.to_string())?;
+    // Result delivery must not depend on Windows granting a foreground-focus request.
+    if take_focus {
+        let _ = popup.set_focus();
+    }
     Ok(())
 }
 
@@ -166,6 +183,24 @@ pub fn show_popup_window(app: &AppHandle, payload: &PopupPayload) -> Result<(), 
 
 pub fn show_popup_window_passive(app: &AppHandle, payload: &PopupPayload) -> Result<(), String> {
     present_popup_window(app, payload, false)
+}
+
+#[cfg(windows)]
+fn show_window_without_activation(window: &WebviewWindow) -> Result<(), String> {
+    use windows::Win32::{
+        Foundation::HWND,
+        UI::WindowsAndMessaging::{ShowWindowAsync, SW_SHOWNOACTIVATE},
+    };
+
+    let handle = window.hwnd().map_err(|error| error.to_string())?;
+    let hwnd = HWND(handle.0 as *mut core::ffi::c_void);
+    let _ = unsafe { ShowWindowAsync(hwnd, SW_SHOWNOACTIVATE) };
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn show_window_without_activation(window: &WebviewWindow) -> Result<(), String> {
+    window.show().map_err(|error| error.to_string())
 }
 
 #[cfg(windows)]
@@ -431,6 +466,56 @@ fn send_copy_shortcut() -> Result<(), String> {
 
 fn send_paste_shortcut() -> Result<(), String> {
     send_ctrl_key(0x56)
+}
+
+#[cfg(windows)]
+fn foreground_window_handle() -> Option<isize> {
+    use windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
+
+    let window = unsafe { GetForegroundWindow() };
+    (!window.0.is_null()).then_some(window.0 as isize)
+}
+
+#[cfg(not(windows))]
+fn foreground_window_handle() -> Option<isize> {
+    None
+}
+
+#[cfg(windows)]
+fn restore_foreground_window(handle: isize) {
+    use windows::Win32::{
+        Foundation::HWND,
+        UI::WindowsAndMessaging::{SetForegroundWindow, ShowWindowAsync, SW_RESTORE},
+    };
+
+    let window = HWND(handle as *mut core::ffi::c_void);
+    let _ = unsafe { ShowWindowAsync(window, SW_RESTORE) };
+    let _ = unsafe { SetForegroundWindow(window) };
+}
+
+#[cfg(not(windows))]
+fn restore_foreground_window(_handle: isize) {}
+
+#[cfg(windows)]
+fn wait_for_shortcut_modifiers_release() {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_CONTROL, VK_MENU, VK_SHIFT};
+
+    for _ in 0..40 {
+        let pressed = unsafe {
+            GetAsyncKeyState(VK_CONTROL.0 as i32) < 0
+                || GetAsyncKeyState(VK_MENU.0 as i32) < 0
+                || GetAsyncKeyState(VK_SHIFT.0 as i32) < 0
+        };
+        if !pressed {
+            return;
+        }
+        thread::sleep(Duration::from_millis(15));
+    }
+}
+
+#[cfg(not(windows))]
+fn wait_for_shortcut_modifiers_release() {
+    thread::sleep(Duration::from_millis(70));
 }
 
 #[cfg(windows)]
