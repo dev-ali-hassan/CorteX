@@ -29,18 +29,22 @@ pub fn copy_text(text: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn replace_selected_text(text: String) -> Result<(), String> {
-    desktop::replace_selected_text(&text, None)
+pub fn replace_selected_text(state: State<'_, AppState>, text: String) -> Result<(), String> {
+    let target = last_selection_window(state.inner())?;
+    desktop::replace_selected_text(&text, None, target)
 }
 
 #[tauri::command]
-pub fn capture_selected_text() -> Result<String, String> {
-    desktop::capture_selected_text().map(|capture| capture.text)
+pub fn capture_selected_text(state: State<'_, AppState>) -> Result<String, String> {
+    let capture = desktop::capture_selected_text()?;
+    store_selection_window(state.inner(), capture.source_window)?;
+    Ok(capture.text)
 }
 
 #[tauri::command]
 pub async fn show_popup(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     let capture = desktop::capture_selected_text()?;
+    store_selection_window(state.inner(), capture.source_window)?;
     let input = capture.text.trim().to_string();
     let payload = if input.is_empty() {
         empty_popup_payload()
@@ -62,6 +66,7 @@ pub async fn show_popup(app: AppHandle, state: State<'_, AppState>) -> Result<()
             &settings,
             &response.output,
             capture.previous_clipboard.clone(),
+            capture.source_window,
         )?;
         PopupPayload::from((response, "manual"))
     };
@@ -205,6 +210,7 @@ pub async fn open_popup_from_shortcut(app: AppHandle) {
             return;
         }
     };
+    let _ = store_selection_window(state.inner(), capture.source_window);
 
     let input = capture.text.trim().to_string();
     let payload = if input.is_empty() {
@@ -233,6 +239,7 @@ pub async fn open_popup_from_shortcut(app: AppHandle) {
                     &settings,
                     &response.output,
                     capture.previous_clipboard.clone(),
+                    capture.source_window,
                 );
                 PopupPayload::from((response, "shortcut"))
             }
@@ -254,6 +261,7 @@ pub async fn run_direct_rewrite_shortcut(app: AppHandle, mode: RewriteMode) {
         Ok(value) => value,
         Err(_) => return,
     };
+    let _ = store_selection_window(state.inner(), capture.source_window);
     let input = capture.text.trim().to_string();
     if input.is_empty() {
         return;
@@ -276,7 +284,12 @@ pub async fn run_direct_rewrite_shortcut(app: AppHandle, mode: RewriteMode) {
 
     let settings = state.db.get_settings().unwrap_or_default();
     let _ =
-        apply_automatic_shortcut_output(&settings, &response.output, capture.previous_clipboard);
+        apply_automatic_shortcut_output(
+            &settings,
+            &response.output,
+            capture.previous_clipboard,
+            capture.source_window,
+        );
 
     let payload = PopupPayload::from((response, "shortcut"));
     let _ = store_popup_payload(state.inner(), &payload);
@@ -289,9 +302,10 @@ fn apply_automatic_shortcut_output(
     settings: &AppSettings,
     output: &str,
     previous_clipboard: Option<String>,
+    target_window: Option<isize>,
 ) -> Result<(), String> {
     if settings.auto_replace {
-        desktop::replace_selected_text(output, previous_clipboard)?;
+        desktop::replace_selected_text(output, previous_clipboard, target_window)?;
         if settings.auto_copy {
             desktop::write_clipboard_text(output)?;
         }
@@ -417,6 +431,23 @@ fn store_popup_payload(state: &AppState, payload: &PopupPayload) -> Result<(), S
         .map_err(|_| "popup state lock poisoned".to_string())?;
     *last_popup = Some(payload.clone());
     Ok(())
+}
+
+fn store_selection_window(state: &AppState, window: Option<isize>) -> Result<(), String> {
+    let mut target = state
+        .last_selection_window
+        .lock()
+        .map_err(|_| "selection target lock poisoned".to_string())?;
+    *target = window;
+    Ok(())
+}
+
+fn last_selection_window(state: &AppState) -> Result<Option<isize>, String> {
+    state
+        .last_selection_window
+        .lock()
+        .map_err(|_| "selection target lock poisoned".to_string())
+        .map(|target| *target)
 }
 
 fn empty_popup_payload() -> PopupPayload {
