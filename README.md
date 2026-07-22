@@ -25,6 +25,10 @@ npm.cmd install --cache .npm-cache
 npm.cmd run tauri:dev
 ```
 
+For normal installation, use `release/CorteX_1.0.1_x64_en-US.msi`. If running
+the portable build instead, keep `release/CorteX.exe` and
+`release/WebView2Loader.dll` together in the same folder.
+
 ## Build
 
 ```powershell
