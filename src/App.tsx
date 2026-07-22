@@ -933,8 +933,8 @@ function SettingsView({
             onChange={(autoCopy) => update({ autoCopy })}
           />
           <ToggleRow
-            label="Auto-replace selection"
-            description="Replace selected text with the improved result"
+            label="Auto-replace direct shortcuts"
+            description="Only affects Ctrl+1–8. The panel always waits for you to click Replace."
             icon={<Wand2 size={20} aria-hidden="true" />}
             checked={settings.autoReplace}
             onChange={(autoReplace) => update({ autoReplace })}

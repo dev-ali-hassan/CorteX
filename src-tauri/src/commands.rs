@@ -61,13 +61,6 @@ pub async fn show_popup(app: AppHandle, state: State<'_, AppState>) -> Result<()
             },
         )
         .await?;
-        let settings = state.db.get_settings().unwrap_or_default();
-        apply_automatic_shortcut_output(
-            &settings,
-            &response.output,
-            capture.previous_clipboard.clone(),
-            capture.source_window,
-        )?;
         PopupPayload::from((response, "manual"))
     };
 
@@ -233,16 +226,9 @@ pub async fn open_popup_from_shortcut(app: AppHandle) {
         )
         .await
         {
-            Ok(response) => {
-                let settings = state.db.get_settings().unwrap_or_default();
-                let _ = apply_automatic_shortcut_output(
-                    &settings,
-                    &response.output,
-                    capture.previous_clipboard.clone(),
-                    capture.source_window,
-                );
-                PopupPayload::from((response, "shortcut"))
-            }
+            // The panel flow is preview-first: never alter the source application
+            // until the user explicitly presses Replace in the popup.
+            Ok(response) => PopupPayload::from((response, "shortcut")),
             Err(error) => error_popup_payload(error),
         }
     };
