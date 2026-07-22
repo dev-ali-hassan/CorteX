@@ -157,7 +157,7 @@ function PopupApp() {
       <section className="popup-card">
         <header className="popup-titlebar" onPointerDownCapture={handleTitlebarPointerDown}>
           <div className="popup-brand">
-            <img src="/cortex-icon.png" alt="" aria-hidden="true" />
+            <img src={`${import.meta.env.BASE_URL}cortex-icon.png`} alt="" aria-hidden="true" />
             <strong>CorteX</strong>
           </div>
           <div className="popup-window-actions">

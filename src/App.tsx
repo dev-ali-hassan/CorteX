@@ -555,7 +555,7 @@ function BrandBlock() {
 function LogoMark({ small = false }: { small?: boolean }) {
   return (
     <span className={clsx("logo-mark", small && "logo-mark-small")} aria-hidden="true">
-      <img src="/cortex-icon.png" alt="" draggable={false} />
+      <img src={`${import.meta.env.BASE_URL}cortex-icon.png`} alt="" draggable={false} />
     </span>
   );
 }
