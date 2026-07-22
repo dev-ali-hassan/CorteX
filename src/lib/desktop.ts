@@ -270,6 +270,10 @@ function browserRewriteFallback(input: string, mode: RewriteModeId, targetLangua
     .replace(/\bI (?:is|are)\b/g, "I am")
     .replace(/\b(you|we|they) is\b/gi, "$1 are")
     .replace(/\b(he|she|it) are\b/gi, "$1 is")
+    .replace(/\bpeople does\b/gi, "people do")
+    .replace(/\bpeople is\b/gi, "people are")
+    .replace(/\bcompanies wants\b/gi, "companies want")
+    .replace(/\b(they|we) has\b/gi, "$1 have")
     .replace(/\bThe team have completed\b/gi, "The team completed")
     .replace(/\bit were\b/gi, "it was")
     .replace(/\bto client\b/gi, "to the client")
@@ -281,7 +285,22 @@ function browserRewriteFallback(input: string, mode: RewriteModeId, targetLangua
     .replace(/\bim\b/gi, "I'm")
     .replace(/\bdont\b/gi, "do not")
     .replace(/\bcant\b/gi, "cannot")
+    .replace(/\b(better|more|rather|different) then\b/gi, "$1 than")
+    .replace(/\byour (welcome|going|able|not|right)\b/gi, "you're $1")
+    .replace(/\btheir (is|are)\b/gi, "there $1")
+    .replace(/\b(over|right) their\b/gi, "$1 there")
+    .replace(/\bthere (team|company|work)\b/gi, "their $1")
+    .replace(/\b(ai|api|cpu|gpu|usa|uk|ui|ux|url|http|https|json|sql|html|css)\b/gi, (word) => word.toUpperCase())
+    .replace(/\b(openai|github|microsoft|google|windows|gemini|cortex|english)\b/gi, (word) => ({
+      openai: "OpenAI", github: "GitHub", microsoft: "Microsoft", google: "Google",
+      windows: "Windows", gemini: "Gemini", cortex: "CorteX", english: "English"
+    })[word.toLowerCase()]!)
+    .replace(/\bjavascript\b/gi, "JavaScript")
+    .replace(/\btypescript\b/gi, "TypeScript")
     .replace(/\s+([,.!?;:])/g, "$1")
+    .replace(/([.!?])(?=[A-Za-z])/g, "$1 ")
+    .replace(/(^|[.!?]\s+)(however|therefore|additionally|meanwhile|nevertheless|consequently)\s+/gi,
+      (_, prefix: string, word: string) => `${prefix}${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}, `)
     .replace(/\s+/g, " ")
     .trim();
   cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);

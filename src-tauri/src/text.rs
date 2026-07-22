@@ -54,6 +54,16 @@ fn fix_grammar(input: &str) -> String {
         ("You is ", "You are "),
         ("We is ", "We are "),
         ("They is ", "They are "),
+        ("People does ", "People do "),
+        ("people does ", "people do "),
+        ("People is ", "People are "),
+        ("people is ", "people are "),
+        ("Companies wants ", "Companies want "),
+        ("companies wants ", "companies want "),
+        ("They has ", "They have "),
+        ("they has ", "they have "),
+        ("We has ", "We have "),
+        ("we has ", "we have "),
         ("He are ", "He is "),
         ("She are ", "She is "),
         ("It are ", "It is "),
@@ -65,6 +75,22 @@ fn fix_grammar(input: &str) -> String {
         (" do not knows ", " do not know "),
         (" does not knows ", " does not know "),
         (" more better", " better"),
+        (" better then ", " better than "),
+        (" more then ", " more than "),
+        (" rather then ", " rather than "),
+        (" different then ", " different than "),
+        (" your welcome", " you're welcome"),
+        (" your going ", " you're going "),
+        (" your able ", " you're able "),
+        (" your not ", " you're not "),
+        (" your right", " you're right"),
+        (" their is ", " there is "),
+        (" their are ", " there are "),
+        (" over their", " over there"),
+        (" right their", " right there"),
+        (" there team", " their team"),
+        (" there company", " their company"),
+        (" there work", " their work"),
         (" was sent to client", " was sent to the client"),
         (" sent to client", " sent to the client"),
         (" i ", " I "),
@@ -91,8 +117,10 @@ fn fix_grammar(input: &str) -> String {
     text = text.replace("hey there I'm", "hey there, I'm");
     text = text.replace("I'm using new application", "I'm using a new application");
     text = tidy_punctuation(&text);
+    text = add_introductory_commas(&text);
 
     text = capitalize_sentences(&text);
+    text = normalize_known_capitalization(&text);
     ensure_terminal_punctuation(&text)
 }
 
@@ -339,13 +367,88 @@ fn tidy_punctuation(input: &str) -> String {
     let chars: Vec<char> = text.chars().collect();
     for (index, character) in chars.iter().enumerate() {
         output.push(*character);
-        if matches!(character, ',' | ';' | ':')
+        if (matches!(character, ',' | ';' | ':')
+            || (matches!(character, '.' | '!' | '?')
+                && chars.get(index + 1).is_some_and(|next| next.is_ascii_alphabetic())))
             && chars.get(index + 1).is_some_and(|next| !next.is_whitespace())
         {
             output.push(' ');
         }
     }
     normalize_spaces(&output)
+}
+
+fn add_introductory_commas(input: &str) -> String {
+    let mut text = input.to_string();
+    for word in [
+        "However", "Therefore", "Additionally", "Meanwhile", "Nevertheless", "Consequently",
+    ] {
+        if text.starts_with(&format!("{word} ")) {
+            text = text.replacen(&format!("{word} "), &format!("{word}, "), 1);
+        }
+        text = text.replace(&format!(". {word} "), &format!(". {word}, "));
+        let lower = word.to_ascii_lowercase();
+        text = text.replace(&format!(". {lower} "), &format!(". {word}, "));
+    }
+    for phrase in ["For example", "In addition", "On the other hand"] {
+        if text.starts_with(&format!("{phrase} ")) {
+            text = text.replacen(&format!("{phrase} "), &format!("{phrase}, "), 1);
+        }
+        text = text.replace(&format!(". {phrase} "), &format!(". {phrase}, "));
+    }
+    text
+}
+
+fn normalize_known_capitalization(input: &str) -> String {
+    let mut output = String::with_capacity(input.len());
+    let mut word = String::new();
+
+    fn push_word(output: &mut String, word: &mut String) {
+        if word.is_empty() {
+            return;
+        }
+        let normalized = match word.to_ascii_lowercase().as_str() {
+            "ai" => "AI",
+            "api" => "API",
+            "cpu" => "CPU",
+            "gpu" => "GPU",
+            "usa" => "USA",
+            "uk" => "UK",
+            "ui" => "UI",
+            "ux" => "UX",
+            "url" => "URL",
+            "http" => "HTTP",
+            "https" => "HTTPS",
+            "json" => "JSON",
+            "sql" => "SQL",
+            "html" => "HTML",
+            "css" => "CSS",
+            "javascript" => "JavaScript",
+            "typescript" => "TypeScript",
+            "github" => "GitHub",
+            "openai" => "OpenAI",
+            "microsoft" => "Microsoft",
+            "google" => "Google",
+            "windows" => "Windows",
+            "gemini" => "Gemini",
+            "cortex" => "CorteX",
+            "english" => "English",
+            _ => word.as_str(),
+        };
+        output.push_str(normalized);
+        word.clear();
+    }
+
+    for character in input.chars() {
+        if character.is_ascii_alphanumeric() {
+            word.push(character);
+        } else {
+            push_word(&mut output, &mut word);
+            output.push(character);
+        }
+    }
+    push_word(&mut output, &mut word);
+    output
 }
 
 fn offline_translate_notice(input: &str, target_language: &str) -> String {
@@ -386,6 +489,23 @@ fn correct_common_words(input: &str) -> String {
         (" becuase ", " because "),
         (" goverment ", " government "),
         (" enviroment ", " environment "),
+        (" accomodate ", " accommodate "),
+        (" acheive ", " achieve "),
+        (" adress ", " address "),
+        (" begining ", " beginning "),
+        (" calender ", " calendar "),
+        (" concious ", " conscious "),
+        (" embarass ", " embarrass "),
+        (" existance ", " existence "),
+        (" independant ", " independent "),
+        (" maintenence ", " maintenance "),
+        (" neccessary ", " necessary "),
+        (" occassion ", " occasion "),
+        (" prefered ", " preferred "),
+        (" recomend ", " recommend "),
+        (" responsability ", " responsibility "),
+        (" succesful ", " successful "),
+        (" tommorow ", " tomorrow "),
         (" untill ", " until "),
         (" wich ", " which "),
         (" woud ", " would "),
@@ -531,6 +651,39 @@ mod tests {
         assert_eq!(
             rewrite_offline("I think we might finish and should be able to ship", &RewriteMode::Confident, None),
             "We will finish and can ship."
+        );
+    }
+
+    #[test]
+    fn every_offline_mode_starts_from_correct_publication_quality_english() {
+        let input = "people does use ai better then companies wants to use it.however your api is over their";
+        let modes = [
+            RewriteMode::FixGrammar,
+            RewriteMode::Professional,
+            RewriteMode::Friendly,
+            RewriteMode::Shorter,
+            RewriteMode::Summarize,
+            RewriteMode::Confident,
+            RewriteMode::Simplify,
+        ];
+
+        for mode in modes {
+            let output = rewrite_offline(input, &mode, None);
+            assert!(output.contains("AI"), "{mode:?} did not capitalize AI: {output}");
+            assert!(output.contains("API"), "{mode:?} did not capitalize API: {output}");
+            assert!(output.contains("However,"), "{mode:?} missed the introductory comma: {output}");
+            for error in ["people does", "companies wants", "better then", "over their"] {
+                assert!(!output.to_ascii_lowercase().contains(error), "{mode:?} retained '{error}': {output}");
+            }
+        }
+    }
+
+    #[test]
+    fn grammar_normalizes_acronyms_proper_nouns_and_common_spelling() {
+        let input = "openai and microsoft recomend javascript api maintenence in the usa";
+        assert_eq!(
+            rewrite_offline(input, &RewriteMode::FixGrammar, None),
+            "OpenAI and Microsoft recommend JavaScript API maintenance in the USA."
         );
     }
 }
