@@ -31,10 +31,7 @@ pub async fn rewrite_with_provider(
     } else {
         format!("{default_instruction}\n\nUser rewrite instructions:\n{saved_instruction}")
     };
-    let prompt = format!(
-        "{instruction}\n\nRules:\n- Return only the rewritten text.\n- Preserve the user's meaning.\n- Do not add explanations.\n\nText:\n{}",
-        request.input
-    );
+    let prompt = build_prompt(&instruction, &request.input);
 
     let output = match settings.provider {
         ProviderId::Openai => {
@@ -117,6 +114,20 @@ pub async fn rewrite_with_provider(
     };
 
     Ok(Some(output))
+}
+
+fn build_prompt(instruction: &str, input: &str) -> String {
+    format!(
+        "You are an expert English editor.\n\nMode instruction:\n{instruction}\n\nMandatory editing baseline for every mode:\n\
+- Correct every spelling, grammar, punctuation, capitalization, sentence-structure, and word-choice error before applying the mode instruction.\n\
+- Capitalize the first word of every sentence, proper nouns, and acronyms such as AI, API, CPU, GPU, and USA.\n\
+- Correct subject-verb agreement.\n\
+- Correct confused words from context, including than/then, their/there, and your/you're.\n\
+- Preserve the original meaning and do not invent information.\n\
+- Make the result natural, fluent, and publication-quality.\n\
+- Return only the final rewritten text: no explanation, markdown, labels, or quotation marks.\n\n\
+Before responding, silently verify spelling, grammar, capitalization, punctuation, agreement, and word choice. If any issue remains, revise it.\n\nText:\n{input}"
+    )
 }
 
 pub async fn test_connection(
@@ -538,9 +549,25 @@ fn read_path<'a>(value: &'a Value, path: &str) -> Option<&'a str> {
 #[cfg(test)]
 mod tests {
     use super::{
-        models_endpoint_from_anthropic, models_endpoint_from_cohere,
+        build_prompt, models_endpoint_from_anthropic, models_endpoint_from_cohere,
         models_endpoint_from_openai_compatible, ollama_tags_endpoint,
     };
+
+    #[test]
+    fn every_provider_prompt_enforces_the_editorial_baseline() {
+        let prompt = build_prompt("Rewrite professionally.", "people does use ai");
+        for requirement in [
+            "Correct every spelling",
+            "Capitalize the first word",
+            "Correct subject-verb agreement",
+            "than/then",
+            "Preserve the original meaning",
+            "Return only the final rewritten text",
+            "silently verify spelling",
+        ] {
+            assert!(prompt.contains(requirement), "missing prompt rule: {requirement}");
+        }
+    }
 
     #[test]
     fn derives_openai_compatible_models_endpoint() {
