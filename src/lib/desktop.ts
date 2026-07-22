@@ -36,6 +36,7 @@ export type AppSettings = {
   autoReplace: boolean;
   autoCopy: boolean;
   defaultLanguage: string;
+  developerMode: boolean;
   customPrompt: string;
   globalShortcut: string;
   grammarShortcut: string;
@@ -80,6 +81,7 @@ export const defaultSettings: AppSettings = {
   autoReplace: true,
   autoCopy: false,
   defaultLanguage: "English",
+  developerMode: false,
   customPrompt: "",
   globalShortcut: "Ctrl + Alt + X",
   grammarShortcut: "Ctrl + 1",
@@ -239,6 +241,9 @@ function mockCommand<T>(command: string, args?: Record<string, unknown>): Promis
     if (request?.customPrompt?.trim()) {
       return Promise.reject(new Error("Connect an AI provider to use Custom Prompt."));
     }
+    if (request?.mode === "translate") {
+      return Promise.reject(new Error("Connect an AI provider to use translation."));
+    }
     const output = request?.input?.trim()
       ? browserRewriteFallback(request.input, request.mode, request.targetLanguage)
       : defaultOutput;
@@ -301,7 +306,7 @@ function browserRewriteFallback(input: string, mode: RewriteModeId, targetLangua
     .replace(/([.!?])(?=[A-Za-z])/g, "$1 ")
     .replace(/(^|[.!?]\s+)(however|therefore|additionally|meanwhile|nevertheless|consequently)\s+/gi,
       (_, prefix: string, word: string) => `${prefix}${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}, `)
-    .replace(/\s+/g, " ")
+    .replace(/[ \t]+/g, " ")
     .trim();
   cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 

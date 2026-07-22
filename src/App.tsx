@@ -37,7 +37,8 @@ import {
   setWindowTheme,
   testProviderConnection,
   windowAction,
-  type AppSettings
+  type AppSettings,
+  type RewriteResponse
 } from "./lib/desktop";
 import { extractTextFromDocument } from "./lib/documentImport";
 import { defaultInput, defaultOutput, rewriteModes, type RewriteModeId } from "./data/modes";
@@ -47,9 +48,7 @@ import { ProviderWizard } from "./components/ProviderWizard";
 type ViewKey = "rewrite" | "settings";
 type ProviderConnectionState = "disconnected" | "checking" | "connected" | "error";
 
-const visibleRewriteModes = rewriteModes.filter(
-  (item) => item.id !== "shorter" && item.id !== "confident"
-);
+const visibleRewriteModes = rewriteModes;
 
 const PROVIDER_ONBOARDING_KEY = "cortex.provider-onboarding.v1";
 
@@ -78,6 +77,7 @@ function App() {
   const [status, setStatus] = useState("Ready");
   const [loading, setLoading] = useState(false);
   const [rewriteElapsedMs, setRewriteElapsedMs] = useState<number | null>(null);
+  const [lastResult, setLastResult] = useState<RewriteResponse | null>(null);
   const [copied, setCopied] = useState(false);
   const [settingsJumpTarget, setSettingsJumpTarget] = useState<string | null>(null);
   const [providerConnection, setProviderConnection] = useState<ProviderConnectionState>("disconnected");
@@ -87,6 +87,7 @@ function App() {
   );
   const [providerWizardOnboarding, setProviderWizardOnboarding] = useState(false);
   const providerCheckId = useRef(0);
+  const rewriteRequestId = useRef(0);
   const [systemPrefersDark, setSystemPrefersDark] = useState(() =>
     window.matchMedia("(prefers-color-scheme: dark)").matches
   );
@@ -168,11 +169,11 @@ function App() {
         }
       });
 
-    listenToTrayNavigation((route) => {
-      if (route === "settings" || route === "rewrite") {
-        setView(route);
-      }
-    }).then((unlisten) => () => unlisten());
+    let stopTrayListener: (() => void) | undefined;
+    void listenToTrayNavigation((route) => {
+      if (route === "settings" || route === "rewrite") setView(route);
+    }).then((unlisten) => { stopTrayListener = unlisten; });
+    return () => stopTrayListener?.();
   }, []);
 
   useEffect(() => {
@@ -222,6 +223,7 @@ function App() {
       return;
     }
 
+    const requestId = ++rewriteRequestId.current;
     setLoading(true);
     setCopied(false);
     setRewriteElapsedMs(null);
@@ -233,17 +235,22 @@ function App() {
         targetLanguage: settings.defaultLanguage,
         customPrompt
       });
+      if (requestId !== rewriteRequestId.current) return;
       setOutput(response.output);
+      setLastResult(response);
       setRewriteElapsedMs(response.elapsedMs);
       setStatus(response.usedOfflineFallback ? "Offline rewrite ready" : "AI rewrite ready");
       if (settings.autoCopy) {
         await copyText(response.output);
+        if (requestId !== rewriteRequestId.current) return;
         setStatus("Rewritten and copied");
       }
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Rewrite failed");
+      if (requestId === rewriteRequestId.current) {
+        setStatus(error instanceof Error ? error.message : "Rewrite failed");
+      }
     } finally {
-      setLoading(false);
+      if (requestId === rewriteRequestId.current) setLoading(false);
     }
   }
 
@@ -251,18 +258,26 @@ function App() {
     if (!output.trim()) {
       return;
     }
-    await copyText(output);
-    setCopied(true);
-    setStatus("Copied");
-    window.setTimeout(() => setCopied(false), 2000);
+    try {
+      await copyText(output);
+      setCopied(true);
+      setStatus("Copied");
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Could not copy the rewrite");
+    }
   }
 
   async function handleReplace() {
     if (!output.trim()) {
       return;
     }
-    await replaceSelectedText(output);
-    setStatus("Replaced selected text");
+    try {
+      await replaceSelectedText(output);
+      setStatus("Replaced selected text");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Could not replace the selected text");
+    }
   }
 
   async function handleDocumentImport(file: File) {
@@ -463,11 +478,21 @@ function App() {
             loading={loading}
             elapsedMs={rewriteElapsedMs}
             status={status}
+            diagnostics={settings.developerMode ? lastResult : null}
             copied={copied}
-            setInput={setInput}
+            setInput={(value) => {
+              setInput(value);
+              setOutput("");
+              setLastResult(null);
+              setRewriteElapsedMs(null);
+              setStatus("Ready");
+            }}
             setMode={(nextMode) => {
               setMode(nextMode);
-              void runRewrite(nextMode);
+              setOutput("");
+              setLastResult(null);
+              setRewriteElapsedMs(null);
+              setStatus(`Ready for ${rewriteModes.find((item) => item.id === nextMode)?.label ?? "rewrite"}`);
             }}
             onRewrite={() => runRewrite()}
             onCustomRewrite={(instruction) => runRewrite(mode, instruction)}
@@ -605,6 +630,7 @@ function QuickRewrite({
   loading,
   elapsedMs,
   status,
+  diagnostics,
   copied,
   setInput,
   setMode,
@@ -620,6 +646,7 @@ function QuickRewrite({
   loading: boolean;
   elapsedMs: number | null;
   status: string;
+  diagnostics: RewriteResponse | null;
   copied: boolean;
   setInput: (value: string) => void;
   setMode: (value: RewriteModeId) => void;
@@ -801,10 +828,10 @@ function QuickRewrite({
               Improved text
             </label>
           </span>
-          <span className="success-chip">
+          {output && <span className="success-chip">
             <CheckCircle2 size={18} aria-hidden="true" />
             {customPromptActive ? "Custom Prompt" : selectedMode?.label ?? "Rewrite"} ready
-          </span>
+          </span>}
         </header>
         <div className={clsx("editor-shell", loading && "editor-shell-loading")}>
           {loading ? (
@@ -828,12 +855,20 @@ function QuickRewrite({
               {status}
             </span>
             <span>{formatElapsed(elapsedMs)}</span>
+            {diagnostics && (
+              <span title="Developer QA diagnostics">
+                {diagnostics.provider} · {diagnostics.mode} · {diagnostics.characterCount.toLocaleString()} chars
+              </span>
+            )}
           </div>
           <span className="word-count output-word-count">{formatWordCount(outputWords)}</span>
           <div className="output-actions">
-            <button className={clsx("primary-action", copied && "copied")} type="button" onClick={onCopy}>
+            <button className={clsx("primary-action", copied && "copied")} type="button" onClick={onCopy} disabled={loading || !output.trim()}>
               {copied ? <CheckCircle2 size={20} aria-hidden="true" /> : <Copy size={23} aria-hidden="true" />}
               <span>{copied ? "Copied" : "Copy"}</span>
+            </button>
+            <button className="primary-action" type="button" onClick={onReplace} disabled={loading || !output.trim()}>
+              <span>Replace</span>
             </button>
             <button
               className="primary-action rewrite-output-action"
@@ -872,12 +907,13 @@ function SettingsView({
     !normalizedSearch || keywords.some((keyword) => keyword.toLowerCase().includes(normalizedSearch));
   const visibleSections = [
     sectionMatches(["ai", "provider", "api key", "test connection", "gemini", "groq", "openai", "openrouter", "anthropic", "mistral", "cohere", "xai", "grok", "deepseek", "ollama"]),
-    sectionMatches(["general", "startup", "auto copy", "auto replace", "behavior"]),
+    sectionMatches(["general", "startup", "auto copy", "auto replace", "behavior", "language", "translation"]),
     sectionMatches(["shortcuts", "floating window", "grammar", "professional", "friendly", "shorter", "translate", "summarize", "confident", "simplify"]),
     sectionMatches(["appearance", "theme", "panel", "popup", "floating", "dark", "light", "system", "windows", "recommended"]),
-    sectionMatches(["privacy", "stored locally", "analytics", "cloud storage"])
+    sectionMatches(["privacy", "stored locally", "analytics", "cloud storage"]),
+    sectionMatches(["developer", "qa", "diagnostics", "provider", "timing", "characters"])
   ];
-  const [showAI, showGeneral, showShortcuts, showAppearance, showPrivacy] = visibleSections;
+  const [showAI, showGeneral, showShortcuts, showAppearance, showPrivacy, showDeveloper] = visibleSections;
   const hasLaterSection = (index: number) => visibleSections.slice(index + 1).some(Boolean);
 
   function update(next: Partial<AppSettings>) {
@@ -918,6 +954,17 @@ function SettingsView({
         {showGeneral && (
         <div className="settings-section settings-card">
           <h2>General</h2>
+          <label className="settings-field">
+            <span>Default translation language</span>
+            <select
+              value={settings.defaultLanguage}
+              onChange={(event) => update({ defaultLanguage: event.target.value })}
+            >
+              {["English", "Spanish", "French", "German", "Italian", "Portuguese", "Arabic", "Urdu", "Hindi", "Chinese", "Japanese", "Korean"].map((language) => (
+                <option key={language} value={language}>{language}</option>
+              ))}
+            </select>
+          </label>
           <ToggleRow
             label="Launch at startup"
             description="Open CorteX automatically when you log in"
@@ -1053,6 +1100,27 @@ function SettingsView({
               </button>
             ))}
           </div>
+        </div>
+        )}
+
+        {showPrivacy && (
+        <div className="settings-section settings-card privacy-section">
+          <h2>Privacy</h2>
+          <p>Your text is processed locally in Offline mode. When you connect a provider, only rewrite requests are sent to that provider. CorteX does not include analytics or advertising trackers.</p>
+          <p>Provider credentials and up to 250 recent rewrites are stored in the app data on this Windows device.</p>
+        </div>
+        )}
+
+        {showDeveloper && (
+        <div className="settings-section settings-card">
+          <h2>Developer</h2>
+          <ToggleRow
+            label="QA diagnostics"
+            description="Show the provider, mode, character count, and timing beside rewrite results"
+            icon={<SlidersHorizontal size={20} aria-hidden="true" />}
+            checked={settings.developerMode}
+            onChange={(developerMode) => update({ developerMode })}
+          />
         </div>
         )}
 

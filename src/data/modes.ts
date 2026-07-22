@@ -18,7 +18,8 @@ export type RewriteModeId =
   | "translate"
   | "summarize"
   | "confident"
-  | "simplify";
+  | "simplify"
+  | "expand";
 
 export type RewriteMode = {
   id: RewriteModeId;
@@ -78,14 +79,18 @@ export const rewriteModes: RewriteMode[] = [
     label: "Simplify",
     description: "Make the text easier to read and understand.",
     icon: Wand2
+  },
+  {
+    id: "expand",
+    label: "Expand",
+    description: "Add useful clarity and detail without changing the meaning.",
+    icon: FileText
   }
 ];
 
-export const defaultInput =
-  "The team have completed the report yesterday and it were sent to client.";
+export const defaultInput = "";
 
-export const defaultOutput =
-  "The team completed the report yesterday and it was sent to the client.";
+export const defaultOutput = "";
 
 export const modeLabel = (mode: RewriteModeId) =>
   rewriteModes.find((item) => item.id === mode)?.label ?? "Rewrite";

@@ -4,7 +4,7 @@ use chrono::Utc;
 use rusqlite::{params, Connection, OptionalExtension};
 use tauri::{AppHandle, Manager};
 
-use crate::models::AppSettings;
+use crate::models::{AppSettings, RewriteResponse};
 
 pub struct Database {
     conn: Mutex<Connection>,
@@ -36,9 +36,40 @@ impl Database {
                 updated_at TEXT NOT NULL
             );
 
-            DROP TABLE IF EXISTS rewrite_history;
+            CREATE TABLE IF NOT EXISTS rewrite_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                input TEXT NOT NULL,
+                output TEXT NOT NULL,
+                mode TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_rewrite_history_created_at
+                ON rewrite_history(created_at DESC);
             "#,
         )?;
+        Ok(())
+    }
+
+    pub fn save_rewrite(&self, response: &RewriteResponse) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|_| "database lock poisoned".to_string())?;
+        conn.execute(
+            "INSERT INTO rewrite_history (input, output, mode, provider, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                response.input,
+                response.output,
+                response.mode.as_id(),
+                response.provider.as_id(),
+                Utc::now().to_rfc3339()
+            ],
+        )
+        .map_err(|error| error.to_string())?;
+        conn.execute(
+            "DELETE FROM rewrite_history WHERE id NOT IN (SELECT id FROM rewrite_history ORDER BY id DESC LIMIT 250)",
+            [],
+        )
+        .map_err(|error| error.to_string())?;
         Ok(())
     }
 

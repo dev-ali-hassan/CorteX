@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import {
   Check,
@@ -51,6 +51,9 @@ function PopupApp() {
   const [payload, setPayload] = useState(initialPayload);
   const [mode, setMode] = useState<RewriteModeId>("fixGrammar");
   const [busy, setBusy] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [targetLanguage, setTargetLanguage] = useState("English");
+  const rewriteRequestId = useRef(0);
   const [panelTheme, setPanelTheme] = useState<"system" | "dark" | "light">("dark");
   const [systemPrefersDark, setSystemPrefersDark] = useState(() =>
     window.matchMedia("(prefers-color-scheme: dark)").matches
@@ -64,11 +67,12 @@ function PopupApp() {
     let stopPayloadListener: (() => void) | undefined;
     let stopSettingsListener: (() => void) | undefined;
 
-    const applySettings = (settings: { popupTheme?: string }) => {
+    const applySettings = (settings: { popupTheme?: string; defaultLanguage?: string }) => {
       if (disposed) return;
       setPanelTheme(
         settings.popupTheme === "light" || settings.popupTheme === "system" ? settings.popupTheme : "dark"
       );
+      if (settings.defaultLanguage) setTargetLanguage(settings.defaultLanguage);
     };
 
     void getSettings().then(applySettings).catch(() => undefined);
@@ -79,12 +83,14 @@ function PopupApp() {
         if (disposed) return;
         receivedPayloadEvent = true;
         setPayload(value);
+        setErrorMessage("");
         setMode(value.mode);
         setBusy(Boolean(value.loading));
       });
       const value = await getPopupPayload();
       if (!disposed && value && !receivedPayloadEvent) {
         setPayload(value);
+        setErrorMessage("");
         setMode(value.mode);
         setBusy(Boolean(value.loading));
       }
@@ -127,46 +133,47 @@ function PopupApp() {
       }
       if (event.key === "Enter" && event.ctrlKey) {
         event.preventDefault();
-        void handleReplace();
+        if (!busy && !errorMessage && payload.output.trim()) void handleReplace();
       }
       if (event.key === "Enter" && !event.shiftKey && !event.ctrlKey) {
         event.preventDefault();
-        void runRewrite(mode);
+        if (!busy) void runRewrite(mode);
       }
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [mode, payload.input]);
+  }, [mode, payload.input, payload.output, busy, errorMessage, targetLanguage]);
 
   async function runRewrite(nextMode: RewriteModeId) {
-    const source = payload.input.trim() || payload.output.trim();
+    const source = payload.input.trim();
     if (!source) {
       return;
     }
+    const requestId = ++rewriteRequestId.current;
     setBusy(true);
+    setErrorMessage("");
     setMode(nextMode);
     try {
-      const response = await rewriteText({ input: source, mode: nextMode });
+      const response = await rewriteText({ input: source, mode: nextMode, targetLanguage });
+      if (requestId !== rewriteRequestId.current) return;
       setPayload({ ...response, source: "manual" });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Rewrite failed. Please try again.";
-      setPayload((current) => ({
-        ...current,
-        output: message,
-        characterCount: Array.from(message).length,
-        loading: false
-      }));
+      if (requestId === rewriteRequestId.current) {
+        setErrorMessage(error instanceof Error ? error.message : "Rewrite failed. Please try again.");
+      }
     } finally {
-      setBusy(false);
+      if (requestId === rewriteRequestId.current) setBusy(false);
     }
   }
 
   async function handleCopy() {
+    if (busy || errorMessage || !payload.output.trim()) return;
     await copyText(payload.output);
   }
 
   async function handleReplace() {
+    if (busy || errorMessage || !payload.output.trim()) return;
     await replaceSelectedText(payload.output);
     await hideCurrentWindow();
   }
@@ -200,12 +207,16 @@ function PopupApp() {
         </header>
 
         <nav className="popup-mode-tabs" aria-label="Rewrite mode">
-          {rewriteModes.slice(0, 6).map((item) => (
+          {rewriteModes.map((item) => (
             <button
               className={clsx(mode === item.id && "active")}
               type="button"
               key={item.id}
-              onClick={() => runRewrite(item.id)}
+              onClick={() => {
+                setMode(item.id);
+                setErrorMessage("");
+                setPayload((current) => ({ ...current, output: "", characterCount: 0 }));
+              }}
               aria-pressed={mode === item.id}
             >
               {mode === item.id ? <Check size={17} aria-hidden="true" /> : <item.icon size={18} aria-hidden="true" />}
@@ -220,7 +231,7 @@ function PopupApp() {
           </div>
           <div className={clsx("popup-output-box", busy && "rewriting")} role="textbox" aria-readonly="true" tabIndex={0}>
             <div className="popup-output-copy" aria-live="polite">
-              {busy ? "Rewriting..." : payload.output || `Ready to ${modeLabel(mode).toLowerCase()}. Select text and use Ctrl + Alt + X.`}
+              {busy ? "Rewriting..." : errorMessage || payload.output || `Ready to ${modeLabel(mode).toLowerCase()}. Select text and use Ctrl + Alt + X.`}
             </div>
             <span className="popup-character-count">
               {visibleCharacterCount.toLocaleString()} / {characterLimit.toLocaleString()}
@@ -230,15 +241,15 @@ function PopupApp() {
 
         <footer className="popup-footer">
           <div className="popup-status" aria-live="polite">
-            <span className="popup-ready"><CheckCircle2 size={18} aria-hidden="true" />{busy ? "Rewriting" : "Ready"}</span>
+            <span className="popup-ready"><CheckCircle2 size={18} aria-hidden="true" />{busy ? "Rewriting" : errorMessage ? "Needs attention" : "Ready"}</span>
             <span className="popup-elapsed"><Clock3 size={17} aria-hidden="true" />{busy ? "..." : formatElapsed(payload.elapsedMs)}</span>
           </div>
           <div className="popup-actions">
-            <button type="button" onClick={handleReplace} className="ghost-action">
+            <button type="button" onClick={handleReplace} className="ghost-action" disabled={busy || Boolean(errorMessage) || !payload.output.trim()}>
               <Replace size={20} aria-hidden="true" />
               Replace
             </button>
-            <button type="button" onClick={handleCopy} className="ghost-action">
+            <button type="button" onClick={handleCopy} className="ghost-action" disabled={busy || Boolean(errorMessage) || !payload.output.trim()}>
               <Copy size={20} aria-hidden="true" />
               Copy
             </button>

@@ -2948,17 +2948,16 @@ kbd {
 }
 
 .popup-mode-tabs {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  display: flex;
   gap: 6px;
-  overflow: hidden;
+  overflow-x: auto;
   border-bottom: 1px solid rgba(148, 163, 184, 0.13);
   padding: 8px 12px;
 }
 
 .popup-mode-tabs button {
   display: inline-flex;
-  min-width: 0;
+  min-width: 96px;
   min-height: 40px;
   align-items: center;
   justify-content: center;
@@ -3286,10 +3285,20 @@ kbd {
 }
 
 .popup-mode-tabs {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 6px;
   padding: 7px 14px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.13);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 .popup-mode-tabs button {
