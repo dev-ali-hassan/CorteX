@@ -11,6 +11,7 @@ pub enum RewriteMode {
     Summarize,
     Confident,
     Simplify,
+    Expand,
 }
 
 impl RewriteMode {
@@ -24,21 +25,10 @@ impl RewriteMode {
             Self::Summarize => "summarize",
             Self::Confident => "confident",
             Self::Simplify => "simplify",
+            Self::Expand => "expand",
         }
     }
 
-    pub fn label(&self) -> &'static str {
-        match self {
-            Self::FixGrammar => "Fix grammar",
-            Self::Professional => "Professional",
-            Self::Friendly => "Friendly",
-            Self::Shorter => "Shorter",
-            Self::Translate => "Translate",
-            Self::Summarize => "Summarize",
-            Self::Confident => "Confident",
-            Self::Simplify => "Simplify",
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -118,6 +108,8 @@ pub struct AppSettings {
     pub auto_copy: bool,
     pub default_language: String,
     #[serde(default)]
+    pub developer_mode: bool,
+    #[serde(default)]
     pub custom_prompt: String,
     pub global_shortcut: String,
     pub grammar_shortcut: String,
@@ -148,6 +140,7 @@ impl Default for AppSettings {
             auto_replace: true,
             auto_copy: false,
             default_language: "English".to_string(),
+            developer_mode: false,
             custom_prompt: String::new(),
             global_shortcut: "Ctrl + Alt + X".to_string(),
             grammar_shortcut: "Ctrl + 1".to_string(),

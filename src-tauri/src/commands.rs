@@ -18,9 +18,7 @@ pub async fn rewrite_text(
     state: State<'_, AppState>,
     request: RewriteRequest,
 ) -> Result<RewriteResponse, String> {
-    let response = rewrite_inner(state.inner(), request).await?;
-    apply_auto_copy(state.inner(), &response)?;
-    Ok(response)
+    rewrite_inner(state.inner(), request).await
 }
 
 #[tauri::command]
@@ -335,6 +333,7 @@ pub async fn rewrite_inner(
 ) -> Result<RewriteResponse, String> {
     let started = Instant::now();
     let settings = state.db.get_settings().unwrap_or_default();
+    const MAX_INPUT_CHARS: usize = 50_000;
     let clean_input = request.input.trim().to_string();
     if clean_input.is_empty() {
         return Ok(RewriteResponse {
@@ -347,20 +346,25 @@ pub async fn rewrite_inner(
             elapsed_ms: started.elapsed().as_millis() as u64,
         });
     }
+    if clean_input.chars().count() > MAX_INPUT_CHARS {
+        return Err(format!("Text is too long. Use {MAX_INPUT_CHARS} characters or fewer."));
+    }
 
     let mut provider_settings = settings.provider.clone();
     provider_settings.custom_prompt = settings.custom_prompt.clone();
-    let requires_provider = request
+    let custom_requires_provider = request
         .custom_prompt
         .as_deref()
         .map(str::trim)
         .is_some_and(|instruction| !instruction.is_empty());
+    let requires_provider = custom_requires_provider || matches!(request.mode, RewriteMode::Translate);
     let provider_result =
         providers::rewrite_with_provider(&state.client, &provider_settings, &request).await;
     let (output, provider, used_offline_fallback) = match provider_result {
         Ok(Some(output)) => (output, settings.provider.provider.clone(), false),
         Ok(None) if requires_provider => {
-            return Err("Connect an AI provider to use Custom Prompt.".to_string())
+            let feature = if matches!(request.mode, RewriteMode::Translate) { "translation" } else { "Custom Prompt" };
+            return Err(format!("Connect an AI provider to use {feature}."))
         }
         Ok(None) => (
             text::rewrite_offline(
@@ -399,15 +403,10 @@ pub async fn rewrite_inner(
         used_offline_fallback,
         elapsed_ms: started.elapsed().as_millis() as u64,
     };
-
-    Ok(response)
-}
-
-fn apply_auto_copy(state: &AppState, response: &RewriteResponse) -> Result<(), String> {
-    if state.db.get_settings().unwrap_or_default().auto_copy {
-        desktop::write_clipboard_text(&response.output)?;
+    if let Err(error) = state.db.save_rewrite(&response) {
+        eprintln!("CorteX could not save rewrite history: {error}");
     }
-    Ok(())
+    Ok(response)
 }
 
 fn store_popup_payload(state: &AppState, payload: &PopupPayload) -> Result<(), String> {

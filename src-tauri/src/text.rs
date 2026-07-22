@@ -13,6 +13,9 @@ pub fn rewrite_offline(input: &str, mode: &RewriteMode, target_language: Option<
         RewriteMode::Summarize => summarize(&fixed),
         RewriteMode::Confident => confident(&fixed),
         RewriteMode::Simplify => simplify(&fixed),
+        // Expansion is intentionally conservative offline. A rules engine cannot
+        // invent supporting detail without risking a change in meaning.
+        RewriteMode::Expand => fixed,
     }
 }
 
@@ -39,10 +42,18 @@ pub fn instruction_for(mode: &RewriteMode, target_language: Option<&str>) -> Str
         RewriteMode::Simplify => {
             "Simplify the text so it is easier to read and understand.".to_string()
         }
+        RewriteMode::Expand => {
+            "Expand the text with useful clarity and detail supported by the source. Do not invent facts.".to_string()
+        }
     }
 }
 
 fn fix_grammar(input: &str) -> String {
+    let leading_indent: String = input
+        .chars()
+        .take_while(|character| matches!(character, ' ' | '\t'))
+        .collect();
+    let had_trailing_newline = input.ends_with('\n');
     let mut text = correct_common_words(&normalize_spaces(input));
 
     let replacements = [
@@ -121,7 +132,14 @@ fn fix_grammar(input: &str) -> String {
 
     text = capitalize_sentences(&text);
     text = normalize_known_capitalization(&text);
-    ensure_terminal_punctuation(&text)
+    let mut output = ensure_terminal_punctuation(&text);
+    if !leading_indent.is_empty() && !output.starts_with(&leading_indent) {
+        output.insert_str(0, &leading_indent);
+    }
+    if had_trailing_newline && !output.ends_with('\n') {
+        output.push('\n');
+    }
+    output
 }
 
 fn professionalize(input: &str) -> String {
@@ -458,7 +476,31 @@ fn offline_translate_notice(input: &str, target_language: &str) -> String {
 }
 
 fn normalize_spaces(input: &str) -> String {
-    input.split_whitespace().collect::<Vec<_>>().join(" ")
+    let had_trailing_newline = input.ends_with('\n');
+    let mut output = input
+        .replace("\r\n", "\n")
+        .replace('\r', "\n")
+        .lines()
+        .map(|line| {
+            let indent_len = line
+                .char_indices()
+                .take_while(|(_, character)| matches!(character, ' ' | '\t'))
+                .last()
+                .map(|(index, character)| index + character.len_utf8())
+                .unwrap_or(0);
+            let (indent, content) = line.split_at(indent_len);
+            if content.trim().is_empty() {
+                String::new()
+            } else {
+                format!("{indent}{}", content.split_whitespace().collect::<Vec<_>>().join(" "))
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    if had_trailing_newline {
+        output.push('\n');
+    }
+    output
 }
 
 fn correct_common_words(input: &str) -> String {
@@ -549,15 +591,20 @@ fn without_casual_greeting(input: &str) -> &str {
 }
 
 fn ensure_terminal_punctuation(input: &str) -> String {
-    let trimmed = input.trim();
+    let had_trailing_newline = input.ends_with('\n');
+    let trimmed = input.trim_end();
     if trimmed.is_empty() {
         return String::new();
     }
-    if trimmed.ends_with('.') || trimmed.ends_with('!') || trimmed.ends_with('?') {
+    let mut output = if trimmed.ends_with('.') || trimmed.ends_with('!') || trimmed.ends_with('?') {
         trimmed.to_string()
     } else {
         format!("{trimmed}.")
+    };
+    if had_trailing_newline {
+        output.push('\n');
     }
+    output
 }
 
 fn capitalize_sentences(input: &str) -> String {
@@ -665,15 +712,16 @@ mod tests {
             RewriteMode::Summarize,
             RewriteMode::Confident,
             RewriteMode::Simplify,
+            RewriteMode::Expand,
         ];
 
         for mode in modes {
             let output = rewrite_offline(input, &mode, None);
-            assert!(output.contains("AI"), "{mode:?} did not capitalize AI: {output}");
-            assert!(output.contains("API"), "{mode:?} did not capitalize API: {output}");
-            assert!(output.contains("However,"), "{mode:?} missed the introductory comma: {output}");
+            assert!(output.contains("AI"), "{:?} did not capitalize AI: {}", mode, output);
+            assert!(output.contains("API"), "{:?} did not capitalize API: {}", mode, output);
+            assert!(output.contains("However,"), "{:?} missed the introductory comma: {}", mode, output);
             for error in ["people does", "companies wants", "better then", "over their"] {
-                assert!(!output.to_ascii_lowercase().contains(error), "{mode:?} retained '{error}': {output}");
+                assert!(!output.to_ascii_lowercase().contains(error), "{:?} retained '{}': {}", mode, error, output);
             }
         }
     }
@@ -685,5 +733,14 @@ mod tests {
             rewrite_offline(input, &RewriteMode::FixGrammar, None),
             "OpenAI and Microsoft recommend JavaScript API maintenance in the USA."
         );
+    }
+
+    #[test]
+    fn grammar_cleanup_preserves_paragraphs_lists_and_indentation() {
+        let input = "Heading\n\n- people does work\n  indented  text\n";
+        let output = rewrite_offline(input, &RewriteMode::FixGrammar, None);
+        assert!(output.contains("\n\n- people do work"));
+        assert!(output.contains("\n  indented text"));
+        assert!(output.ends_with('\n'));
     }
 }

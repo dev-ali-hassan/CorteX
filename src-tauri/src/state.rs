@@ -1,6 +1,7 @@
 use std::{
     error::Error,
     sync::{atomic::AtomicBool, Mutex},
+    time::Duration,
 };
 
 use tauri::AppHandle;
@@ -21,6 +22,8 @@ impl AppState {
             db: Database::new(app)?,
             client: reqwest::Client::builder()
                 .user_agent("CorteX/1.0")
+                .connect_timeout(Duration::from_secs(10))
+                .timeout(Duration::from_secs(45))
                 .build()?,
             last_popup: Mutex::new(None),
             last_selection_window: Mutex::new(None),
