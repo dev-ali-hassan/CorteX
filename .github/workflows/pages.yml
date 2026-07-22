@@ -36,6 +36,16 @@ jobs:
       - name: Build website
         run: npm run build
 
+      - name: Verify compiled website
+        shell: bash
+        run: |
+          test -f dist/index.html
+          if grep -q '/src/main.tsx' dist/index.html; then
+            echo 'The Pages artifact references raw TypeScript instead of the compiled application.' >&2
+            exit 1
+          fi
+          grep -Eq 'assets/index-[A-Za-z0-9_-]+\.js' dist/index.html
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
@@ -47,3 +57,18 @@ jobs:
       - name: Deploy website
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Verify public website
+        shell: bash
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          page_url="${PAGE_URL}?deployment=${GITHUB_SHA}"
+          curl --fail --silent --show-error --location \
+            --retry 5 --retry-all-errors --retry-delay 5 \
+            "$page_url" --output /tmp/cortex-page.html
+          if grep -q '/src/main.tsx' /tmp/cortex-page.html; then
+            echo 'GitHub Pages is serving the repository source instead of the compiled artifact.' >&2
+            exit 1
+          fi
+          grep -Eq 'assets/index-[A-Za-z0-9_-]+\.js' /tmp/cortex-page.html
